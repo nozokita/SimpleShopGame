@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+
+# Xcode
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+build/
+*.hmap
+*.xcscheme
+*.moved-aside
+
+# Swift Package Manager
+.build/
+Packages/
+*.resolved
+
+# Cocoapods
+Pods/
+
+# Carthage
+Carthage/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Secrets (Add your own sensitive files here)
+# .env 
