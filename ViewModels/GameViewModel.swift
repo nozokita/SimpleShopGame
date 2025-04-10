@@ -1,0 +1,864 @@
+import SwiftUI
+import AVFoundation // AVFoundationをインポート
+import Combine // TimerのためにCombineをインポート（なくても動くことが多いが念のため）
+
+// ゲームの状態を表すEnum
+enum GameState {
+    case initialSelection // 追加: 最初のモード選択画面
+    case modeSelection    // 既存: お店屋さんモードの詳細選択
+    case playing          // 既存: お店屋さんモードプレイ中
+    case playingCustomer  // 追加: お客さんモードプレイ中
+    case animalCare       // 追加: どうぶつのおへや
+    case result
+}
+
+// ゲームモードを表すEnum
+enum GameMode: CaseIterable {
+    case shopping // 通常のお買い物モード
+    case calculationQuiz // 簡単な計算モード
+    case priceQuiz // 金額計算モード
+    case listeningQuiz // リスニングクイズモード (追加)
+}
+
+// 時間制限の選択肢 (追加)
+enum TimeLimitOption: Double, CaseIterable, Identifiable {
+    case short = 30.0
+    case medium = 60.0
+    case long = 90.0
+
+    var id: Double { self.rawValue }
+
+    var displayName: String {
+        switch self {
+        case .short: return "30秒"
+        case .medium: return "60秒"
+        case .long: return "90秒"
+        }
+    }
+}
+
+// UserDefaults のキー
+private let clearedDatesKey = "clearedDates"
+private let highScoresKey = "highScores" // ハイスコア保存用キー (追加)
+
+// ゲームの状態とロジックを管理するViewModel
+// @Observable マクロを削除し、ObservableObjectに準拠
+class GameViewModel: ObservableObject {
+    // MARK: - Speech Synthesis (追加)
+    private let speechSynthesizer = AVSpeechSynthesizer()
+
+    // MARK: - Game Mode
+    @Published var currentGameMode: GameMode = .shopping
+    @Published var currentShopType: ShopType = .fruitStand // 現在の店タイプ (初期値を修正)
+
+    // MARK: - Game Constants
+    let maxMistakes: Int = 3    // 最大許容間違い回数
+
+    // MARK: - Properties (状態変数)
+    // Viewに更新を通知したいプロパティに @Published を追加
+    @Published var selectedTimeLimitOption: TimeLimitOption = .medium // 時間選択 (追加)
+    @Published var products: [Product] = []
+    @Published var currentOrder: Order? = nil // 構造が変わったので注意
+    @Published var userSelection: [String: Int] = [:]
+    @Published var calculationInput: String = "" // 計算モードでのユーザー入力
+    @Published var priceInput: String = "" // 価格クイズモードでのユーザー入力 (追加)
+    @Published var currentScore: Int = 0 // 現在のスコア (追加)
+    @Published var mistakeCount: Int = 0 // 間違い回数
+    @Published var currentLanguage: String = "ja" { // didSet を追加
+        didSet {
+            // 言語が日本語に変更され、かつリスニングモードだったらモード選択に戻す
+            if currentLanguage == "ja" && currentGameMode == .listeningQuiz {
+                print("Language changed to Japanese during Listening Quiz. Returning to mode selection.")
+                returnToModeSelection()
+            }
+        }
+    }
+    @Published var gameState: GameState = .initialSelection // 現在のゲーム状態
+    @Published var remainingTime: Double = 60.0 // 初期値は selectedTimeLimitOption に合わせる
+
+    // アニメーション & フィードバック用フラグ
+    @Published var showFeedbackOverlay: Bool = false // 正解/不正解フィードバック表示フラグ
+    @Published var feedbackIsCorrect: Bool = true // フィードバックの内容が正解か不正解か
+    @Published var tappedProductKey: String? = nil // タップされたアイコンのキー
+    @Published var isNewHighScore: Bool = false // ハイスコア更新フラグ (追加)
+
+    // 効果音プレイヤー
+    private var correctSoundPlayer: AVAudioPlayer? // 正解（注文完了）時の音
+    private var incorrectSoundPlayer: AVAudioPlayer? // 不正解時の音
+    // private var itemSelectSoundPlayer: AVAudioPlayer? // <<< 削除
+
+    // タイマー
+    private var timer: Timer?
+    private var cancellable: AnyCancellable? // TimerをCombineで扱う場合の代替 (今回は未使用)
+
+    // MARK: - Customer Selection (追加)
+    @Published var currentCustomerImageName: String = "customer1" // 現在のお客様画像名 (追加)
+
+    // 利用可能なお客様画像名のリスト (追加)
+    private let customerImageNames = ["customer1", "customer2", "customer3"]
+
+    // MARK: - Computed Properties for Views (追加)
+
+    /// 計算クイズで表示する商品と個数のリスト (新設)
+    var calculationProductsToDisplay: [(product: Product, quantity: Int)] {
+        // 現在の注文アイテムを取得し、回答用アイテムを除外
+        let items = currentOrder?.items.filter { $0.productKey != "total_quantity_answer" } ?? []
+        
+        // OrderItem を (Product, Int) のタプルに変換
+        let productsAndQuantities = items.compactMap { item -> (Product, Int)? in
+            // getProduct(byId:) を self で呼び出す
+            if let product = self.getProduct(byId: item.productKey) {
+                return (product: product, quantity: item.quantity)
+            } else {
+                print("Warning: Product not found for key \(item.productKey) in calculationProductsToDisplay")
+                return nil
+            }
+        }
+        return productsAndQuantities
+    }
+
+    // MARK: - Initialization
+    init() {
+        remainingTime = selectedTimeLimitOption.rawValue // 初期値を設定
+        loadProducts() // 商品データは最初にロードしておく
+        loadSounds()
+    }
+
+    deinit { // ViewModelが破棄されるときにタイマーを停止
+        invalidateTimer()
+    }
+
+    // MARK: - Game Setup & Reset
+    /// ゲームの初期設定またはリセットを行う（モード選択後に呼ぶ想定）
+    func setupGame(mode: GameMode) {
+        // リスニングクイズは英語のみ
+        if mode == .listeningQuiz && currentLanguage != "en" {
+            print("Listening Quiz requires English. Switching to Shopping mode.")
+            currentGameMode = .shopping // 強制的にショッピングモードに
+        } else {
+            currentGameMode = mode
+        }
+
+        currentScore = 0 // スコアをリセット (追加)
+        mistakeCount = 0
+        gameState = .playing
+        userSelection = [:]
+        calculationInput = "" // 入力もリセット
+        priceInput = "" // 価格入力もリセット (追加)
+        showFeedbackOverlay = false
+        remainingTime = selectedTimeLimitOption.rawValue // 選択された時間でリセット (追加)
+        invalidateTimer()
+        loadProducts()
+        selectRandomCustomer() // 最初の顧客を選ぶ
+        generateNewOrder()     // 最初の注文を生成
+        startTimer()           // タイマーを開始 (追加)
+    }
+
+    /// ゲームをモード選択状態に戻す
+    func returnToModeSelection() {
+        invalidateTimer() // タイマーを止める
+        gameState = .initialSelection
+        // その他の状態もリセット（任意）
+        currentOrder = nil
+        userSelection = [:]
+        calculationInput = "" // 入力もリセット
+        priceInput = "" // 価格入力もリセット (追加)
+        currentScore = 0 // スコアもリセット
+        isNewHighScore = false // ハイスコアフラグもリセット
+    }
+
+    /// ゲームをリセットする（現在はモード選択に戻る）
+    func resetGame() {
+        // setupGame() // 以前は直接リセットしていた
+        returnToModeSelection() // モード選択画面に戻るように変更
+    }
+
+    // MARK: - Sound Loading
+    private func loadSounds() {
+        correctSoundPlayer = loadSound(fileName: "success")
+        incorrectSoundPlayer = loadSound(fileName: "failure")
+        // itemSelectSoundPlayer = loadSound(fileName: "success") // <<< 削除
+    }
+
+    /// 指定されたファイル名の音声ファイルをロードしてAVAudioPlayerを生成する
+    private func loadSound(fileName: String) -> AVAudioPlayer? {
+        // mp3形式を想定
+        guard let soundURL = Bundle.main.url(forResource: fileName, withExtension: "mp3") else {
+            print("Error: Sound file \(fileName).mp3 not found.")
+            return nil
+        }
+
+        do {
+            let player = try AVAudioPlayer(contentsOf: soundURL)
+            player.prepareToPlay() // 再生前にバッファリングしておく
+            return player
+        } catch {
+            print("Error loading sound file \(fileName).mp3: \(error)")
+            return nil
+        }
+    }
+
+    // MARK: - Timer Control
+    /// タイマーを開始する
+    private func startTimer() {
+        // 念のため既存タイマーを停止
+        invalidateTimer()
+        // 残り時間をリセットしないように変更 (setupGameで設定されるため)
+        // remainingTime = selectedTimeLimitOption.rawValue
+        // タイマーを開始 (1秒ごとに timerTick を呼ぶ)
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.timerTick()
+        }
+    }
+
+    /// タイマーを停止・無効化する
+    func invalidateTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    /// タイマーが1秒進むごとに呼ばれる処理
+    private func timerTick() {
+        guard gameState == .playing else {
+            invalidateTimer() // プレイ中でなければタイマー停止
+            return
+        }
+
+        remainingTime -= 1
+        print("Remaining Time: \(remainingTime)")
+
+        if remainingTime <= 0 {
+            handleTimeUp()
+        }
+    }
+
+    // MARK: - Customer Selection (追加)
+    /// ランダムにお客様を選択して画像名を更新する
+    private func selectRandomCustomer() {
+        currentCustomerImageName = customerImageNames.randomElement() ?? "customer1"
+        print("Selected customer: \(currentCustomerImageName)")
+    }
+
+    // MARK: - Speech Output (追加)
+    /// 現在の注文内容を読み上げる (英語のみ)
+    private func speakOrder() {
+        guard currentLanguage == "en" else { return }
+        
+        var textToSpeak = ""
+        // リスニングモードの場合は、内部的に持っている正しい注文テキストを読み上げる
+        if currentGameMode == .listeningQuiz, let order = currentOrder {
+            textToSpeak = generateShoppingOrderText(order: order) // Shoppingモードのテキスト生成を流用
+        } else {
+             textToSpeak = displayOrderText() // それ以外のモードは表示テキストを読む
+        }
+
+        guard !textToSpeak.isEmpty, textToSpeak != "...", textToSpeak != "Listen!" else { return }
+
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
+        let utterance = AVSpeechUtterance(string: textToSpeak)
+        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        utterance.pitchMultiplier = 1.0
+        speechSynthesizer.speak(utterance)
+    }
+
+    // MARK: - Game Logic Methods
+
+    /// 商品データをロードする（お店の種類によって切り替え）
+    func loadProducts() {
+        switch currentShopType {
+        case .fruitStand:
+            products = fruitProducts
+        case .bakery:
+            products = bakeryProducts
+        case .cakeShop:
+            products = cakeProducts
+        case .restaurant: // レストランのケースを追加
+            products = restaurantProducts
+        }
+        print("Loaded products for shop type: \(currentShopType)")
+        // シャッフルして毎回順序を変える (任意)
+        products.shuffle()
+    }
+
+    /// 新しい注文を生成する
+    func generateNewOrder() {
+        // タイマーを開始 (setupGame からここに移動？ → いや、初回だけ setupGame で開始し、2問目以降は不要)
+        // startTimer() // ここでタイマーを開始しない
+
+        userSelection = [:] // ユーザー選択をリセット
+        calculationInput = "" // 計算入力もリセット
+        priceInput = "" // 価格入力もリセット (追加)
+        tappedProductKey = nil // タップ状態もリセット
+        selectRandomCustomer() // 新しいお客さんを選ぶ
+
+        switch currentGameMode {
+        case .shopping:
+            currentOrder = generateShoppingOrder()
+        case .calculationQuiz:
+            currentOrder = generateCalculationQuizOrder()
+        case .priceQuiz:
+            currentOrder = generatePriceQuizOrder()
+        case .listeningQuiz:
+            // リスニングクイズ用の注文生成（ショッピングと同じ形式）
+            currentOrder = generateShoppingOrder()
+        }
+        print("Generated new order: \(currentOrder?.items ?? [])")
+        speakOrder() // switch文の後に移動 (追加)
+    }
+
+    /// 通常のお買い物注文を生成する
+    private func generateShoppingOrder() -> Order {
+        // --- 難易度調整ロジック (coinCount -> currentScore) ---
+        let difficultyLevel = currentScore
+        let maxItemTypes: Int
+        let maxQuantityPerItem: Int
+        if difficultyLevel < 2 { maxItemTypes = 1; maxQuantityPerItem = 1 }
+        else if difficultyLevel < 5 { maxItemTypes = min(2, products.count); maxQuantityPerItem = 2 }
+        else if difficultyLevel < 8 { maxItemTypes = min(3, products.count); maxQuantityPerItem = 2 }
+        else { maxItemTypes = min(3, products.count); maxQuantityPerItem = 3 }
+
+        var orderItems: [OrderItem] = []
+        let numberOfItemTypes = Int.random(in: 1...maxItemTypes)
+        let availableProducts = products.shuffled()
+        for i in 0..<numberOfItemTypes {
+            let product = availableProducts[i]
+            let quantity = Int.random(in: 1...maxQuantityPerItem)
+            orderItems.append(OrderItem(productKey: product.key, quantity: quantity))
+        }
+        return Order(items: orderItems)
+    }
+
+    /// 計算モードの注文 (問題) を生成する
+    private func generateCalculationQuizOrder() -> Order {
+        // 現在のお店の商品からランダムに2種類選ぶ (最低2種類必要)
+        guard products.count >= 2 else {
+            print("Error: Need at least 2 products for calculation quiz. Switching to shopping.")
+            currentGameMode = .shopping
+            return generateShoppingOrder()
+        }
+        let selectedProducts = products.shuffled().prefix(2)
+        let product1 = selectedProducts[0]
+        let product2 = selectedProducts[1]
+        
+        // それぞれの個数を決定 (1〜3個程度)
+        let quantity1 = Int.random(in: 1...3)
+        let quantity2 = Int.random(in: 1...3)
+        
+        // 合計個数を計算
+        let totalQuantity = quantity1 + quantity2
+        
+        // 表示用の注文アイテム (これが視覚的表示に使われる)
+        let item1 = OrderItem(productKey: product1.key, quantity: quantity1)
+        let item2 = OrderItem(productKey: product2.key, quantity: quantity2)
+        
+        // 答え用のアイテム
+        let answerItem = OrderItem(productKey: "total_quantity_answer", quantity: totalQuantity)
+        
+        return Order(items: [item1, item2, answerItem])
+    }
+
+    /// 金額計算注文を生成する
+    private func generatePriceQuizOrder() -> Order {
+        // --- 難易度調整 (coinCount -> currentScore) ---
+        let difficultyLevel = currentScore
+        let numItems: Int
+        let maxQuantity: Int
+        let isChangeQuiz: Bool = difficultyLevel >= 9 // 9コイン以上でおつり問題
+
+        if isChangeQuiz {
+            // おつり問題: 2〜3品、各1〜2個
+            numItems = Int.random(in: 2...3)
+            maxQuantity = 2
+        } else if difficultyLevel >= 6 {
+            // 上級: 3品、各1〜2個
+            numItems = 3
+            maxQuantity = 2
+        } else if difficultyLevel >= 3 {
+            // 中級: 2品、各1〜2個
+            numItems = 2
+            maxQuantity = 2
+        } else {
+            // 初級: 2品、各1個
+            numItems = 2
+            maxQuantity = 1
+        }
+        // --------------------
+
+        guard products.count >= numItems else {
+            print("Error: Not enough products for price quiz difficulty. Switching to shopping.")
+            currentGameMode = .shopping
+            return generateShoppingOrder()
+        }
+
+        // ランダムに商品を選ぶ
+        let selectedProducts = products.shuffled().prefix(numItems)
+        var orderItems: [OrderItem] = []
+        var totalPrice: Int = 0
+
+        for product in selectedProducts {
+            let quantity = Int.random(in: 1...maxQuantity)
+            orderItems.append(OrderItem(productKey: product.key, quantity: quantity))
+            totalPrice += product.price * quantity
+        }
+
+        if isChangeQuiz {
+            // おつり計算問題の場合
+            // キリの良い支払金額を決定 (合計より大きく、次の100円単位または500円単位など)
+            // 例: 合計が430円なら500円、870円なら1000円
+            let paymentAmount: Int
+            if totalPrice < 100 {
+                paymentAmount = 100
+            } else if totalPrice < 500 {
+                 // 100円単位で切り上げ
+                paymentAmount = Int(ceil(Double(totalPrice) / 100.0)) * 100
+            } else {
+                // 500円単位で切り上げ (ただし合計+100円以上になるように調整)
+                let basePayment = Int(ceil(Double(totalPrice) / 500.0)) * 500
+                paymentAmount = max(basePayment, Int(ceil(Double(totalPrice) / 100.0)) * 100) // 100円単位切り上げより小さくならないように
+            }
+             // 稀に合計と支払いが同額になるケースを避ける（必ずおつりが出るように）
+            let finalPaymentAmount = (paymentAmount <= totalPrice) ? paymentAmount + (paymentAmount < 500 ? 100 : 500) : paymentAmount
+
+
+            let change = finalPaymentAmount - totalPrice
+
+            // 支払金額と答え（おつり）をダミーアイテムとして追加
+            let paymentItem = OrderItem(productKey: "payment_amount", quantity: finalPaymentAmount)
+            let answerItem = OrderItem(productKey: "change_answer", quantity: change)
+            return Order(items: orderItems + [paymentItem, answerItem])
+        } else {
+            // 合計金額問題の場合
+            // 合計金額を答えとしてダミーアイテムに格納
+            let answerItem = OrderItem(productKey: "price_answer", quantity: totalPrice)
+            return Order(items: orderItems + [answerItem])
+        }
+    }
+
+    /// 商品がタップされたときの処理 (ユーザー選択を更新)
+    func productTapped(_ product: Product) {
+        guard gameState == .playing else { return }
+
+        // ユーザー選択に商品を追加/カウントアップ
+        let currentCount = userSelection[product.key, default: 0]
+        userSelection[product.key] = currentCount + 1
+        print("User selected: \(product.key), new count: \(userSelection[product.key]!)")
+
+        // --- タッチフィードバック用 --- 
+        tappedProductKey = product.key // タップされたキーを記録
+        // 少し遅れて解除
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            // 他のアイコンがタップされていなければ解除
+            if self.tappedProductKey == product.key {
+                self.tappedProductKey = nil
+            }
+        }
+        // --------------------------
+
+        // TODO: タップした商品アイコンへのフィードバックアニメーション
+    }
+
+    /// ユーザーの選択を確定し、正誤判定を行う
+    func submitUserSelection() {
+        guard let order = currentOrder else { return }
+        var isCorrect = false
+
+        switch currentGameMode {
+        case .shopping, .listeningQuiz:
+            let correctSelection = order.items.reduce(into: [String: Int]()) { result, item in
+                result[item.productKey] = item.quantity
+            }
+            isCorrect = (userSelection == correctSelection)
+
+        case .calculationQuiz:
+            if let userAnswer = Int(calculationInput),
+               let correctAnswerItem = order.items.first(where: { $0.productKey == "total_quantity_answer" }) {
+                isCorrect = (userAnswer == correctAnswerItem.quantity)
+            } else {
+                isCorrect = false // 入力が数値でない場合は不正解
+            }
+            
+        case .priceQuiz:
+            // 価格クイズの正誤判定 (追加)
+            let correctTotalPrice = order.items.reduce(0) { total, item in
+                if let product = getProduct(byId: item.productKey) {
+                    return total + (product.price * item.quantity)
+                } else {
+                    print("Warning: Product not found for key \(item.productKey) in price quiz submission.")
+                    return total
+                }
+            }
+            
+            if let userAnswer = Int(priceInput) {
+                isCorrect = (userAnswer == correctTotalPrice)
+            } else {
+                isCorrect = false // 入力が数値でない場合は不正解
+            }
+        }
+
+        if isCorrect {
+            handleCorrectSubmission()
+        } else {
+            handleIncorrectSubmission()
+        }
+    }
+
+    /// 正しい選択が提出されたときの処理
+    private func handleCorrectSubmission() {
+        print("Submission Correct! Score: \(currentScore + 1)")
+        currentScore += 1 // スコアをインクリメント (追加)
+        correctSoundPlayer?.currentTime = 0
+        correctSoundPlayer?.play()
+
+        feedbackIsCorrect = true
+        showFeedbackOverlay = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.showFeedbackOverlay = false
+
+            // 時間切れでない限り、次の注文へ
+            if self.gameState == .playing {
+                self.generateNewOrder()
+            }
+        }
+    }
+
+    /// 間違った選択が提出されたときの処理
+    private func handleIncorrectSubmission() {
+        print("Submission Incorrect! Mistakes: \(mistakeCount + 1)")
+        mistakeCount += 1
+        incorrectSoundPlayer?.currentTime = 0
+        incorrectSoundPlayer?.play()
+        feedbackIsCorrect = false
+        showFeedbackOverlay = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.showFeedbackOverlay = false
+            self.userSelection = [:]
+            self.calculationInput = ""
+            self.priceInput = ""
+            if self.mistakeCount >= self.maxMistakes {
+                self.handleTimeUp()
+            }
+        }
+    }
+
+    /// 時間切れ時の処理 (または間違い上限到達時)
+    private func handleTimeUp() {
+        guard gameState == .playing else { return } // 既に結果表示などに遷移していたら何もしない
+
+        print("Time Up or Max Mistakes Reached! Final Score: \(currentScore)")
+        invalidateTimer() // タイマー停止
+        gameState = .result // 結果表示状態へ (変更)
+
+        // ハイスコアをチェック・保存
+        let previousHighScore = loadHighScore(for: currentGameMode, timeLimit: selectedTimeLimitOption)
+        if currentScore > previousHighScore {
+            print("New High Score! \(currentScore) (Previous: \(previousHighScore))")
+            isNewHighScore = true
+            saveHighScore(currentScore, for: currentGameMode, timeLimit: selectedTimeLimitOption)
+        } else {
+            print("Score \(currentScore), High Score \(previousHighScore)")
+            isNewHighScore = false
+        }
+
+        // 結果表示画面へ遷移する (ContentView側で gameState を見て表示を切り替える)
+        // 必要なら効果音など
+        // correctSoundPlayer?.play() // 例: 終了音
+    }
+
+    // MARK: - Data Persistence (UserDefaults)
+    /// クリアした日付をUserDefaultsに保存する
+    private func saveClearedDate(_ date: Date) {
+        let defaults = UserDefaults.standard
+        // 既存のクリア日付リストを読み込む (なければ空の配列)
+        var clearedDates = defaults.object(forKey: clearedDatesKey) as? [Date] ?? []
+
+        // 日付の「年月日」部分だけを比較して、同じ日の記録がなければ追加
+        let calendar = Calendar.current
+        let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
+        let todayStart = calendar.date(from: dateComponents)!
+
+        if !clearedDates.contains(where: { calendar.isDate($0, inSameDayAs: todayStart) }) {
+            clearedDates.append(todayStart) // 同じ日の重複を避けて追加
+            defaults.set(clearedDates, forKey: clearedDatesKey)
+            print("Saved cleared date: \(todayStart)")
+        } else {
+            print("Date already saved for today: \(todayStart)")
+        }
+    }
+
+    /// UserDefaultsからクリア日付リストを読み込む (カレンダー表示用)
+    func loadClearedDates() -> [Date] {
+        return UserDefaults.standard.object(forKey: clearedDatesKey) as? [Date] ?? []
+    }
+
+    // --- ハイスコア保存・読み込み --- (変更)
+    private func highScoreKey(for mode: GameMode, timeLimit: TimeLimitOption) -> String {
+        return "\(highScoresKey)_\(mode)_\(timeLimit.rawValue)"
+    }
+
+    /// ハイスコアを保存する (スコアと日付を一緒に保存)
+    func saveHighScore(_ score: Int, for mode: GameMode, timeLimit: TimeLimitOption) {
+        let key = highScoreKey(for: mode, timeLimit: timeLimit)
+        // 現在の日付も一緒に保存する
+        let scoreData: [String: Any] = ["score": score, "date": Date()]
+        UserDefaults.standard.set(scoreData, forKey: key)
+        print("Saved high score data for \(mode) (\(timeLimit.displayName)): Score \(score), Date \(Date())")
+    }
+
+    /// 指定されたモード・時間のハイスコア(スコアのみ)を読み込む
+    func loadHighScore(for mode: GameMode, timeLimit: TimeLimitOption) -> Int {
+        let key = highScoreKey(for: mode, timeLimit: timeLimit)
+        // 保存されている辞書を読み込む
+        guard let scoreData = UserDefaults.standard.dictionary(forKey: key),
+              let score = scoreData["score"] as? Int else {
+            return 0 // データがない、または形式が違う場合は0を返す
+        }
+        return score
+    }
+
+    /// 日付ごとにグループ化されたハイスコア記録を読み込む (カレンダー用 - 追加)
+    func loadScoresByDate() -> [Date: [(mode: GameMode, time: TimeLimitOption, score: Int)]] {
+        var scoresDict: [Date: [(mode: GameMode, time: TimeLimitOption, score: Int)]] = [:]
+        let defaults = UserDefaults.standard
+        let calendar = Calendar.current
+
+        // 全てのモードと時間の組み合わせを試す
+        for mode in GameMode.allCases { // GameModeにallCasesを追加する必要あり
+            for timeLimit in TimeLimitOption.allCases {
+                let key = highScoreKey(for: mode, timeLimit: timeLimit)
+                if let scoreData = defaults.dictionary(forKey: key),
+                   let score = scoreData["score"] as? Int,
+                   let date = scoreData["date"] as? Date {
+                    
+                    // 日付の「年月日」部分を取得してキーにする
+                    let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
+                    guard let dayKey = calendar.date(from: dateComponents) else { continue }
+
+                    let record = (mode: mode, time: timeLimit, score: score)
+
+                    if scoresDict[dayKey] != nil {
+                        scoresDict[dayKey]?.append(record)
+                    } else {
+                        scoresDict[dayKey] = [record]
+                    }
+                }
+            }
+        }
+        print("Loaded scores grouped by date: \(scoresDict.count) days")
+        return scoresDict
+    }
+
+    // MARK: - Helper Methods (表示用)
+    /// 現在の言語設定に応じた注文テキストを生成して返す (モード別)
+    func displayOrderText() -> String {
+        // リスニングモードではテキストを表示しない (指示のみ)
+        if currentGameMode == .listeningQuiz {
+            return currentLanguage == "ja" ? "よく聞いてね！" : "Listen carefully!"
+        }
+        
+        guard let order = currentOrder, !order.items.isEmpty else { return "..." }
+
+        switch currentGameMode {
+        case .shopping:
+            return generateShoppingOrderText(order: order)
+        case .calculationQuiz:
+            return generateCalculationQuizOrderText(order: order)
+        case .priceQuiz:
+            return generatePriceQuizOrderText(order: order)
+        case .listeningQuiz: // このケースを追加
+            break // 冒頭で return しているので、ここには到達しないはず
+        }
+        // switch文の外に到達することは理論上ないが、コンパイラ警告を避けるために空文字列を返す
+        print("Warning: displayOrderText reached unexpected end.")
+        return ""
+    }
+    
+    /// 通常の買い物注文テキストを生成
+    private func generateShoppingOrderText(order: Order) -> String {
+        guard !order.items.isEmpty else { return "..." }
+
+        let itemStrings = order.items.compactMap { item -> String? in
+            guard let product = products.first(where: { $0.key == item.productKey }) else { return nil }
+            
+            if currentLanguage == "ja" {
+                let name = product.nameJA
+                let quantityString = "\(item.quantity)個"
+                return "\(name) \(quantityString)"
+            } else {
+                // --- English Text Generation Logic (Modified) ---
+                let quantity = item.quantity
+                let name = product.nameEN
+                var formattedName = name
+
+                if quantity == 1 {
+                    // Quantity 1: Use "one" explicitly for clarity
+                    formattedName = "one \(name)"
+                } else {
+                    // Quantity > 1: Handle pluralization
+                    if name == "Gyoza" || name == "Curry Rice" { // These don't usually take 's'
+                         formattedName = "\(quantity) \(name)"
+                    } else if name.hasSuffix("s") { // Already ends in 's'
+                         formattedName = "\(quantity) \(name)"
+                    } else {
+                        // Add 's' for plural
+                         formattedName = "\(quantity) \(name)s"
+                    }
+                }
+                return formattedName
+                // --- End of Modification ---
+            }
+        }
+
+        if currentLanguage == "ja" {
+            let joinedItems = itemStrings.joined(separator: " と ")
+            return "\(joinedItems) ください"
+        } else {
+            // Format the final sentence for English
+            var joinedItems = ""
+            if itemStrings.count == 1 {
+                joinedItems = itemStrings[0]
+            } else if itemStrings.count > 1 {
+                // Join with commas and 'and' before the last item
+                let allButLast = itemStrings.dropLast().joined(separator: ", ")
+                if let last = itemStrings.last {
+                    joinedItems = "\(allButLast) and \(last)"
+                } else {
+                    joinedItems = allButLast // Should not happen if count > 1
+                }
+            } else {
+                joinedItems = "something" // Should not happen with the guard at the top
+            }
+            
+            return "Can I have \(joinedItems) please?"
+        }
+    }
+
+    /// 計算モードの注文テキストを生成
+    private func generateCalculationQuizOrderText(order: Order) -> String {
+        // 答え用アイテムを除いた、表示用の商品アイテムを取得
+        let displayItems = order.items.filter { $0.productKey != "total_quantity_answer" }
+        
+        // 商品名と個数を文字列に変換
+        let itemStrings = displayItems.compactMap { item -> String? in
+            guard let product = products.first(where: { $0.key == item.productKey }) else { return nil }
+            let name = currentLanguage == "ja" ? product.nameJA : product.nameEN
+            let quantityString = "\(item.quantity)"
+            
+            if currentLanguage == "ja" { 
+                return "\(name) \(quantityString)こ"
+            } else {
+                // 英語の複数形対応 (generateShoppingOrderTextから流用)
+                var formattedName = name
+                 if item.quantity > 1 {
+                     if name != "Gyoza" && name != "Curry Rice" && !name.hasSuffix("s") { 
+                          formattedName = "\(name)s"
+                     } 
+                 }
+                return "\(quantityString) \(formattedName)"
+            }
+        }
+
+        guard !itemStrings.isEmpty else { return "ぜんぶで なんこ？" } // 安全策
+        
+        // 問題文を組み立て
+        let joinedItems = itemStrings.joined(separator: currentLanguage == "ja" ? " と " : " and ")
+        return currentLanguage == "ja" ? "\(joinedItems) で ぜんぶで なんこ？" : "How many \(joinedItems) in total?"
+    }
+
+    /// 金額計算注文テキストを生成
+    private func generatePriceQuizOrderText(order: Order) -> String {
+        // 表示用の商品アイテムのみフィルタリング
+         let displayItems = order.items.filter { !["price_answer", "payment_amount", "change_answer"].contains($0.productKey) }
+
+        guard !displayItems.isEmpty else { return "..." }
+
+        let itemStrings = displayItems.compactMap { item -> String? in
+            guard let product = products.first(where: { $0.key == item.productKey }) else { return nil }
+            let name = currentLanguage == "ja" ? product.nameJA : product.nameEN
+            let quantityString = "\(item.quantity)"
+            let priceString = "(¥\(product.price))"
+
+            if currentLanguage == "ja" {
+                return "\(name)\(priceString) \(quantityString)個"
+            } else {
+                return "\(quantityString) \(name)\(priceString)"
+            }
+        }
+
+        let joinedItems = itemStrings.joined(separator: currentLanguage == "ja" ? " と " : " and ")
+
+        // おつり問題かどうかを判定 (payment_amount があるか)
+        if let paymentItem = order.items.first(where: { $0.productKey == "payment_amount" }) {
+            let paymentAmount = paymentItem.quantity
+            if currentLanguage == "ja" {
+                 return "\(joinedItems) で \(paymentAmount)円 はらったら おつりは いくら？"
+            } else {
+                // Consider phrasing like "If you pay ¥[amount] for [items], how much change do you get?"
+                return "You bought \(joinedItems). If you pay ¥\(paymentAmount), how much change?"
+            }
+        } else {
+            // 合計金額問題の場合
+            return currentLanguage == "ja" ? "\(joinedItems) で おかね は いくら？" : "How much is \(joinedItems) in total?"
+        }
+    }
+
+    /// ユーザーの選択内容を表示用のテキストに変換する
+    func displayUserSelectionText() -> String {
+        guard !userSelection.isEmpty else {
+            return currentLanguage == "ja" ? "(まだ選んでいません)" : "(Nothing selected yet)"
+        }
+
+        let itemStrings = userSelection.sorted(by: { $0.key < $1.key }).compactMap { key, quantity -> String? in
+            guard let product = products.first(where: { $0.key == key }) else { return nil }
+            let name = currentLanguage == "ja" ? product.nameJA : product.nameEN
+            if currentLanguage == "ja" {
+                return "\(name) \(quantity)つ"
+            } else {
+                return "\(quantity) \(name)\(quantity > 1 ? "s" : "")"
+            }
+        }
+
+        return itemStrings.joined(separator: ", ")
+    }
+
+    // MARK: - Product Retrieval (変更なし)
+    /// 商品キーを使って商品を取得する
+    func getProduct(byId key: String) -> Product? {
+        return products.first(where: { $0.key == key })
+    }
+
+    // MARK: - Navigation Methods (追加)
+
+    /// お店屋さんモード（モード選択）へ遷移する
+    func goToShopModeSelection() {
+        print("Navigating to Shop Mode Selection")
+        gameState = .modeSelection
+        // 必要に応じて追加のリセット処理
+    }
+
+    /// お客さんモードを開始する
+    func startCustomerMode() {
+        print("Starting Customer Mode")
+        gameState = .playingCustomer
+        // 必要に応じてモード開始時の初期化処理
+        // 例: selectRandomCustomer() など？
+        // setupGame(mode: .shopping) // ← 別のモード用のセットアップは適切か要検討
+        invalidateTimer() // タイマーは一旦止めるなど
+        currentScore = 0 // スコアリセットなど
+        mistakeCount = 0
+    }
+
+    /// どうぶつのおへやモードを開始する
+    func startAnimalCareMode() {
+        print("Starting Animal Care Mode")
+        gameState = .animalCare
+        // 必要に応じてモード開始時の初期化処理
+        invalidateTimer() // タイマーは一旦止めるなど
+        currentScore = 0 // スコアリセットなど
+        mistakeCount = 0
+    }
+} 
