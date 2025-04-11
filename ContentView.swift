@@ -87,13 +87,14 @@ struct ContentView: View {
                 GameplayView(viewModel: viewModel, showingCalendar: $showingCalendar)
                     .transition(.opacity.animation(.easeInOut))
             case .playingCustomer:
-                // ★ 新しいお客さんモードビュー (プレースホルダー)
-                CustomerModeView(viewModel: viewModel, showingCalendar: $showingCalendar) // 仮のビュー名
+                // ★ CustomerModeView を表示するように修正
+                CustomerModeView(viewModel: viewModel, showingCalendar: $showingCalendar)
                     .transition(.opacity.animation(.easeInOut))
             case .animalCare:
-                // ★ 新しい動物のおへやビュー (プレースホルダー)
-                AnimalCareView(viewModel: viewModel, showingCalendar: $showingCalendar) // 仮のビュー名
-                    .transition(.opacity.animation(.easeInOut))
+                // ★ AnimalCareView が削除されたため、一時的にText表示にする
+                Text("どうぶつのおへや (実装中)")
+                    .font(.largeTitle)
+                    .transition(.opacity.animation(.easeInOut)) // transition は残してもOK
             case .result:
                 ResultView(viewModel: viewModel)
             }
@@ -171,20 +172,35 @@ struct ProductGridView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 90))], spacing: 20) {
                  ForEach(viewModel.products) { product in
                      // --- Product Cell --- (個々の商品表示)
-                     VStack(spacing: 8) {
+                     VStack(spacing: 5) { // spacing を少し調整
                          Image(product.imageName)
-                             .resizable().scaledToFit().frame(width: 70, height: 70) // アイコン少し大きく
+                             .resizable().scaledToFit().frame(width: 70, height: 70)
                              .background(Color.white.opacity(0.8)).cornerRadius(15).shadow(radius: 2)
                          Text(viewModel.currentLanguage == "ja" ? product.nameJA : product.nameEN)
                              .font(.caption).fontWeight(.medium).lineLimit(1)
+                         // ★ 価格表示を追加
+                         Text("¥\(product.price)")
+                             .font(.callout.bold())
+                             .foregroundColor(.blue)
                      }
-                     .padding(12)
+                     .padding(.vertical, 10) // 縦のpadding調整
+                     .padding(.horizontal, 8)
+                     .frame(minHeight: 120) // セルの最低高さを確保して揃える
                      .background(Material.thin)
                      .cornerRadius(18)
                      .shadow(color: .gray.opacity(0.3), radius: 4, x: 0, y: 2)
-                     .scaleEffect(viewModel.tappedProductKey == product.key ? 1.1 : 1.0) // 少し控えめに
+                     .scaleEffect(viewModel.tappedProductKey == product.key ? 1.1 : 1.0)
                      .animation(.spring(response: 0.2, dampingFraction: 0.6), value: viewModel.tappedProductKey == product.key)
-                     .onTapGesture { viewModel.productTapped(product) }
+                     // ★ タップアクションを修正: お客さんモードかどうかで分岐
+                     .onTapGesture {
+                         if viewModel.gameState == .playingCustomer {
+                             // お客さんモードではカートに追加
+                             viewModel.addToCustomerCart(product)
+                         } else {
+                             // お店屋さんモードでは従来通り
+                             viewModel.productTapped(product)
+                         }
+                     }
                      // --- End Product Cell ---
                  }
              }.padding()
@@ -649,38 +665,9 @@ struct LargeModeButton: View {
     }
 }
 
-// --- ★ 新しいプレースホルダービュー --- 
-struct CustomerModeView: View {
-    @ObservedObject var viewModel: GameViewModel
-    @Binding var showingCalendar: Bool // TopBarなどで使う可能性を考慮
-
-    var body: some View {
-        VStack {
-            TopBarView(viewModel: viewModel, showingCalendar: $showingCalendar) // TopBarは再利用できるかも
-            Spacer()
-            Text("お客さんモード (実装中)")
-                .font(.largeTitle)
-            Spacer()
-            // ここにお客さんモードのUIを実装していく
-        }
-    }
-}
-
-struct AnimalCareView: View {
-    @ObservedObject var viewModel: GameViewModel
-    @Binding var showingCalendar: Bool // TopBarなどで使う可能性を考慮
-
-    var body: some View {
-        VStack {
-            TopBarView(viewModel: viewModel, showingCalendar: $showingCalendar) // TopBarは再利用できるかも
-            Spacer()
-            Text("どうぶつのおへや (実装中)")
-                .font(.largeTitle)
-            Spacer()
-            // ここに動物のおへやのUIを実装していく
-        }
-    }
-}
+// --- ★ 古いプレースホルダービューを削除 --- 
+// struct CustomerModeView: View { ... } // 削除
+// struct AnimalCareView: View { ... } // 削除
 
 // --- Preview ---
 struct InitialModeSelectionView_Previews: PreviewProvider {

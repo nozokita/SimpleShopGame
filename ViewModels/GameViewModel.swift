@@ -12,6 +12,13 @@ enum GameState {
     case result
 }
 
+// ★ 追加: お客さんモード内のサブ状態
+enum CustomerSubMode {
+    case shoppingList    // 買い物リストモード
+    case budgetChallenge // 予算チャレンジモード (将来用)
+    // 必要なら他のモードも追加 (例: .checkout - 支払い画面)
+}
+
 // ゲームモードを表すEnum
 enum GameMode: CaseIterable {
     case shopping // 通常のお買い物モード
@@ -50,6 +57,12 @@ class GameViewModel: ObservableObject {
     // MARK: - Game Mode
     @Published var currentGameMode: GameMode = .shopping
     @Published var currentShopType: ShopType = .fruitStand // 現在の店タイプ (初期値を修正)
+
+    // MARK: - Customer Mode Properties (追加)
+    @Published var customerSubMode: CustomerSubMode = .shoppingList
+    @Published var currentShoppingList: [OrderItem]? = nil // 購入目標リスト
+    @Published var customerCart: [OrderItem] = []       // プレイヤーのカート
+    @Published var paymentAmount: Int = 0               // プレイヤーの支払い額
 
     // MARK: - Game Constants
     let maxMistakes: Int = 3    // 最大許容間違い回数
@@ -840,16 +853,17 @@ class GameViewModel: ObservableObject {
         // 必要に応じて追加のリセット処理
     }
 
-    /// お客さんモードを開始する
+    /// お客さんモードを開始する (★ 修正)
     func startCustomerMode() {
-        print("Starting Customer Mode")
+        print("Starting Customer Mode - Shopping List")
         gameState = .playingCustomer
+        customerSubMode = .shoppingList // サブモードを設定
         // 必要に応じてモード開始時の初期化処理
-        // 例: selectRandomCustomer() など？
-        // setupGame(mode: .shopping) // ← 別のモード用のセットアップは適切か要検討
-        invalidateTimer() // タイマーは一旦止めるなど
-        currentScore = 0 // スコアリセットなど
+        invalidateTimer() // タイマーは一旦止める
+        currentScore = 0 // スコアリセット
         mistakeCount = 0
+        loadProducts() // 商品データをロード (お店タイプは currentShopType に依存)
+        generateShoppingListMission() // 最初のミッションを生成
     }
 
     /// どうぶつのおへやモードを開始する
@@ -861,4 +875,123 @@ class GameViewModel: ObservableObject {
         currentScore = 0 // スコアリセットなど
         mistakeCount = 0
     }
+
+    // MARK: - Customer Mode Methods (追加)
+    func generateShoppingListMission() {
+        // TODO: 買い物リストを生成するロジック
+        print("Generating new shopping list mission...")
+        // ダミーデータ設定 (後で実装)
+        // よりランダム性を持たせる
+        let shuffledProducts = products.shuffled()
+        guard shuffledProducts.count >= 2 else {
+            print("Not enough products to generate a shopping list.")
+            currentShoppingList = []
+            return
+        }
+        let product1 = shuffledProducts[0]
+        let product2 = shuffledProducts[1]
+        let quantity1 = Int.random(in: 1...2) // 個数を1〜2に
+        let quantity2 = Int.random(in: 1...2)
+
+        currentShoppingList = [
+            OrderItem(productKey: product1.key, quantity: quantity1),
+            OrderItem(productKey: product2.key, quantity: quantity2)
+        ]
+
+        resetCustomerCartAndPayment() // 新しいミッション開始時にカートと支払いをリセット
+    }
+
+    func addToCustomerCart(_ product: Product) {
+        // どのサブモードでもカートには追加できるようにしても良いかも？
+        // guard customerSubMode == .shoppingList else { return }
+
+        // カート内の既存アイテムを探す
+        if let index = customerCart.firstIndex(where: { $0.productKey == product.key }) {
+            customerCart[index].quantity += 1
+        } else {
+            customerCart.append(OrderItem(productKey: product.key, quantity: 1))
+        }
+        print("Added \(product.nameEN) to customer cart. Cart: \(customerCart)")
+    }
+
+    // カートから商品を減らす、または削除するメソッド (任意で追加)
+    func removeFromCustomerCart(_ product: Product) {
+        // guard customerSubMode == .shoppingList else { return }
+        if let index = customerCart.firstIndex(where: { $0.productKey == product.key }) {
+            if customerCart[index].quantity > 1 {
+                customerCart[index].quantity -= 1
+            } else {
+                customerCart.remove(at: index)
+            }
+            print("Removed \(product.nameEN) from customer cart. Cart: \(customerCart)")
+        }
+    }
+
+    func addPayment(amount: Int) {
+        paymentAmount += amount
+        print("Payment amount: \(paymentAmount)")
+    }
+
+    func confirmPayment() {
+        // TODO: 正誤判定ロジック
+        print("Confirming payment...")
+        guard let shoppingList = currentShoppingList else { 
+            print("Error: Shopping list is nil.")
+            return
+        }
+
+        // 正しい合計金額を計算
+        let correctTotal = shoppingList.reduce(0) { total, item in
+            if let product = getProduct(byId: item.productKey) {
+                return total + (product.price * item.quantity)
+            }
+            print("Warning: Product not found for key \(item.productKey) in shopping list.")
+            return total
+        }
+
+        let isCorrect = (paymentAmount == correctTotal)
+
+        if isCorrect {
+            print("Payment correct!")
+            // TODO: 正解時の処理 (スコア加算、フィードバック表示、次のミッション生成など)
+            showFeedbackAndGenerateNextMission()
+        } else {
+            print("Payment incorrect! Expected: \(correctTotal), Paid: \(paymentAmount)")
+            // TODO: 不正解時の処理 (フィードバック表示、支払いリセットなど)
+            showIncorrectFeedbackAndResetPayment()
+        }
+    }
+
+    // カートと支払いをリセットするヘルパーメソッド
+    private func resetCustomerCartAndPayment() {
+        customerCart = []
+        paymentAmount = 0
+        print("Customer cart and payment reset.")
+    }
+
+    // 正解フィードバック表示と次のミッション生成 (仮)
+    private func showFeedbackAndGenerateNextMission() {
+        feedbackIsCorrect = true
+        showFeedbackOverlay = true
+        // 正解音？
+         correctSoundPlayer?.play()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.showFeedbackOverlay = false
+            self.generateShoppingListMission() // 次のミッションへ
+        }
+    }
+
+    // 不正解フィードバック表示と支払いリセット (仮)
+    private func showIncorrectFeedbackAndResetPayment() {
+         feedbackIsCorrect = false
+         showFeedbackOverlay = true
+         // 間違いカウントは別途考慮が必要かも
+         // mistakeCount += 1
+         incorrectSoundPlayer?.play()
+         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+             self.showFeedbackOverlay = false
+             self.paymentAmount = 0 // 支払いだけリセット
+             // if self.mistakeCount >= self.maxMistakes { self.handleTimeUp() }
+         }
+     }
 } 
