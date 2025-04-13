@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ShoppingListView: View {
     @ObservedObject var viewModel: GameViewModel
+    @Binding var isCheckingOut: Bool
 
     var body: some View {
         VStack(spacing: 15) {
@@ -17,12 +18,11 @@ struct ShoppingListView: View {
             CustomerCartView(cart: viewModel.customerCart, language: viewModel.currentLanguage, getProduct: viewModel.getProduct, removeFromCartAction: viewModel.removeFromCustomerCart)
                 .padding(.horizontal)
 
-            // 4. レジに進むボタン (仮)
+            // 4. レジに進むボタン
             Button {
-                // TODO: レジ画面 (CheckoutView) へ遷移する処理
+                // ★ ボタンが押されたら isCheckingOut を true にする
                 print("Proceed to Checkout tapped")
-                // viewModel.customerSubMode = .checkout のような状態遷移？
-                // → CustomerModeView側で状態を持つ方が良いかも (例: @State private var isCheckingOut = false)
+                isCheckingOut = true
             } label: {
                 Label(viewModel.currentLanguage == "ja" ? "レジにすすむ" : "Checkout", systemImage: "chevron.right.circle.fill")
                     .font(.title2.bold())
@@ -133,33 +133,10 @@ struct CustomerCartView: View {
 
 // --- Preview ---
 struct ShoppingListView_Previews: PreviewProvider {
-    static var previews: some View {
-        // ViewModelの準備を previews の外で行うか、別の方法を使う
-        // 例: ヘルパー関数や別のstruct内で準備
-        // ShoppingListView(viewModel: createPreviewViewModel())
-        
-        // または、View自体に直接ダミーデータを渡すように ShoppingListView を変更する
-        // (今回はViewModelを使う前提のため、上記のViewModel準備方法が推奨)
-        
-        // とりあえず、単純なプレビュー表示
-        ShoppingListView(viewModel: GameViewModel()) // これだとリストやカートは空になる
-        
-        // データが入った状態のプレビューを見たい場合は、以下のようにする
-        // let previewViewModel = GameViewModel()
-        // setupPreviewData(for: previewViewModel)
-        // return ShoppingListView(viewModel: previewViewModel)
-    }
+    // ★ プレビュー用に isCheckingOut のダミー Binding を提供
+    @State static var isCheckingOutPreview = false
 
-    // プレビュー用ViewModel準備ヘルパー (例)
-    /*
-    static func setupPreviewData(for viewModel: GameViewModel) {
-        if let product1 = viewModel.products.first, let product2 = viewModel.products.dropFirst().first {
-            viewModel.currentShoppingList = [OrderItem(productKey: product1.key, quantity: 1), OrderItem(productKey: product2.key, quantity: 2)]
-            viewModel.customerCart = [
-                OrderItem(productKey: product1.key, quantity: 1),
-                OrderItem(productKey: product2.key, quantity: 1)
-            ]
-        }
+    static var previews: some View {
+        ShoppingListView(viewModel: GameViewModel(), isCheckingOut: $isCheckingOutPreview)
     }
-    */
 } 
