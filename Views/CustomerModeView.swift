@@ -56,6 +56,21 @@ struct CustomerModeView: View {
                 Spacer() // 仮
             }
         }
+        // ★ isCheckingOut の変化を監視し、CheckoutViewが閉じた後の処理を追加
+        .onChange(of: isCheckingOut) { newValue in
+            // isCheckingOut が false になった（シートが閉じた）時
+            if !newValue {
+                // 支払い成功で閉じられた場合のみ新しいミッションを生成
+                if viewModel.paymentSuccessful {
+                    print("Checkout successful, generating new mission.")
+                    viewModel.generateShoppingListMission()
+                    viewModel.paymentSuccessful = false // ViewModelのフラグをリセット
+                } else {
+                    // キャンセルボタンなどで閉じられた場合 (何もしないか、特定の処理)
+                    print("Checkout cancelled or closed without payment.")
+                }
+            }
+        }
         .onAppear {
             // CustomerMode が表示されたときの初期化処理があればここに追加
             // ViewModel側で実施済みのため、通常は不要かも

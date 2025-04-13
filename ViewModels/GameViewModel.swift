@@ -90,8 +90,9 @@ class GameViewModel: ObservableObject {
     @Published var remainingTime: Double = 60.0 // 初期値は selectedTimeLimitOption に合わせる
 
     // アニメーション & フィードバック用フラグ
-    @Published var showFeedbackOverlay: Bool = false // 正解/不正解フィードバック表示フラグ
-    @Published var feedbackIsCorrect: Bool = true // フィードバックの内容が正解か不正解か
+    @Published var showFeedbackOverlay: Bool = false
+    @Published var feedbackIsCorrect: Bool = true // true: Correct, false: Incorrect
+    @Published var paymentSuccessful: Bool = false // ★ 支払い成功フラグを追加
     @Published var tappedProductKey: String? = nil // タップされたアイコンのキー
     @Published var isNewHighScore: Bool = false // ハイスコア更新フラグ (追加)
 
@@ -953,8 +954,9 @@ class GameViewModel: ObservableObject {
 
         if isCorrect {
             print("Payment correct!")
-            // TODO: 正解時の処理 (スコア加算、フィードバック表示、次のミッション生成など)
-            showFeedbackAndGenerateNextMission()
+            // ★ 正解フラグを立てる
+            paymentSuccessful = true
+            showFeedbackAndGenerateNextMission() // フィードバック表示
         } else {
             print("Payment incorrect! Expected: \(correctTotal), Paid: \(paymentAmount)")
             // TODO: 不正解時の処理 (フィードバック表示、支払いリセットなど)
@@ -969,7 +971,7 @@ class GameViewModel: ObservableObject {
         print("Customer cart and payment reset.")
     }
 
-    // 正解フィードバック表示と次のミッション生成 (仮)
+    // 正解フィードバック表示と次のミッション生成 (仮) -> (★ 修正: 次のミッション生成は削除)
     private func showFeedbackAndGenerateNextMission() {
         feedbackIsCorrect = true
         showFeedbackOverlay = true
@@ -977,7 +979,8 @@ class GameViewModel: ObservableObject {
          correctSoundPlayer?.play()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             self.showFeedbackOverlay = false
-            self.generateShoppingListMission() // 次のミッションへ
+            // 画面は paymentSuccessful フラグで閉じるのでここでは何もしない
+            print("Payment successful feedback shown.") 
         }
     }
 

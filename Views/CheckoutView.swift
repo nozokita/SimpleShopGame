@@ -68,6 +68,12 @@ struct CheckoutView: View {
              // 支払い画面が表示されたときに支払い額をリセット
              viewModel.paymentAmount = 0
         }
+        // ★ 支払い成功フラグを監視して画面を閉じる
+        .onChange(of: viewModel.paymentSuccessful) { newValue in
+            if newValue {
+                isPresented = false // 支払い成功時に画面を閉じる
+            }
+        }
     }
 
     // ★ 合計金額を計算するヘルパー関数
