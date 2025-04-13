@@ -21,7 +21,7 @@ struct MoneyInputView: View {
 
     var body: some View {
         VStack {
-            Text("支払う金額: ¥\(viewModel.paymentAmount)")
+            Text("\(viewModel.currentLanguage == "ja" ? "支払う金額" : "Paying Amount"): ¥\(viewModel.paymentAmount)")
                 .font(.title2.bold())
                 .padding(.bottom, 10)
 
@@ -37,7 +37,7 @@ struct MoneyInputView: View {
                                 // --- ★ ここからサイズ調整 --- 
                                 .frame(height: 40) // 高さを基準にサイズ調整
                                 // --- ★ ここまでサイズ調整 ---
-                            Text("\(money.value) 円")
+                            Text(viewModel.currentLanguage == "ja" ? "\(money.value) 円" : "¥\(money.value)")
                                 .font(.caption) // フォント調整
                         }
                         .frame(maxWidth: .infinity, minHeight: 70) // ボタンサイズ調整

@@ -91,10 +91,12 @@ struct ContentView: View {
                 CustomerModeView(viewModel: viewModel, showingCalendar: $showingCalendar)
                     .transition(.opacity.animation(.easeInOut))
             case .animalCare:
-                // ★ AnimalCareView が削除されたため、一時的にText表示にする
-                Text("どうぶつのおへや (実装中)")
-                    .font(.largeTitle)
-                    .transition(.opacity.animation(.easeInOut)) // transition は残してもOK
+                // ★ AnimalCareView が削除されたため、一時的にText表示にする -> Placeholder View に変更
+                // Text("どうぶつのおへや (実装中)")
+                //     .font(.largeTitle)
+                //     .transition(.opacity.animation(.easeInOut))
+                AnimalCarePlaceholderView(viewModel: viewModel) // ★ Placeholder View を表示
+                    .transition(.opacity.animation(.easeInOut))
             case .result:
                 ResultView(viewModel: viewModel)
             }
@@ -247,28 +249,21 @@ struct ModeSelectionView: View {
     @Binding var showingCalendar: Bool
 
     var body: some View {
-        // ZStackを調整して左上にボタンを配置可能にする
-        ZStack(alignment: .topLeading) { // alignment を .topLeading に変更
+        ZStack(alignment: .topLeading) { 
             LinearGradient(gradient: Gradient(colors: [Color.yellow.opacity(0.3), Color.orange.opacity(0.2)]), startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
 
-            // 中央のコンテンツ（変更なし）
+            // 中央のコンテンツ
             VStack(spacing: 15) {
-                Image("character_happy")
+                Image("character_happy") // ★ キャラクターやタイトルはあっても良い
                     .resizable().scaledToFit().frame(width: 130, height: 130).padding(.top, 50)
-                Text(viewModel.currentLanguage == "ja" ? "ハッピーショッピング" : "Happy Shopping")
+                Text(viewModel.currentLanguage == "ja" ? "モードをえらんでね" : "Select Game Mode") // ★ タイトル変更
                     .font(.largeTitle.bold())
                     .foregroundColor(.orange)
                 
-                // --- お店タイプ選択UI (サブビューに切り出し) ---
-                ShopTypeSelectionView(viewModel: viewModel)
-                    .padding(.bottom, 15)
-                
-                Text(viewModel.currentLanguage == "ja" ? "どのモードで遊ぶ？" : "Choose a Mode")
-                    .font(.title2).foregroundColor(.gray).padding(.bottom, 10)
-
-                // --- モード選択ボタン (サブビューに切り出し) --- 
+                // --- モード選択ボタン (サブビューに切り出し) ---
                 ModeSelectionButtonsView(viewModel: viewModel)
+                    .padding(.top, 20) // 上の間隔を調整
 
                 Spacer()
             }
@@ -299,78 +294,8 @@ struct ModeSelectionView: View {
             .padding() // 画面端からの余白
         }
         .onAppear {
-            viewModel.loadProducts()
+            // viewModel.loadProducts() // ★ ここでの商品ロードは不要になる
         }
-    }
-}
-
-// --- Shop Type Selection Subview --- (アイコン表示に修正)
-struct ShopTypeSelectionView: View {
-    @ObservedObject var viewModel: GameViewModel
-
-    var body: some View {
-        VStack(spacing: 12) { // 全体の間隔を少し広げる
-            Text(viewModel.currentLanguage == "ja" ? "お店を選ぶ" : "Select Shop Type")
-                .font(.headline).foregroundColor(.secondary)
-
-            // --- カスタムのショップ選択UI ---
-            HStack(alignment: .top, spacing: 15) { // アイコンとテキストを並べるHStack
-                ForEach(ShopType.allCases) { shopType in
-                    // --- 個々のボタンを ShopTypeButtonView に切り出し ---
-                    ShopTypeButtonView(viewModel: viewModel, shopType: shopType)
-                }
-            }
-            .padding(.horizontal) // 左右に余白を追加
-            // .pickerStyle(.segmented) // segmented Pickerは削除
-            // .onChange はButtonのアクション内で直接実行
-        }
-    }
-}
-
-// --- 個々のショップタイプボタン用ビュー (新規作成) ---
-struct ShopTypeButtonView: View {
-    @ObservedObject var viewModel: GameViewModel
-    let shopType: ShopType
-
-    // 選択されているかどうかを判定するプロパティ
-    private var isSelected: Bool {
-        viewModel.currentShopType == shopType
-    }
-
-    var body: some View {
-        Button {
-            // タップされたら選択中のショップタイプを更新し、商品を再読み込み
-            viewModel.currentShopType = shopType
-            viewModel.loadProducts()
-        } label: {
-            VStack(spacing: 5) { // アイコンとテキストを縦に配置
-                Image(shopType.imageName) // ShopTypeから画像名を取得 (要実装)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 50, height: 50) // アイコンサイズ調整
-                    .padding(10) // アイコン周りのパディング
-                    // 選択中のショップを視覚的に強調 (例: 背景色を変更)
-                    .background(
-                        Circle()
-                            .fill(isSelected ? Color.orange.opacity(0.2) : Color.black.opacity(0.05))
-                    )
-                    .overlay( // 選択中の枠線 (任意)
-                        Circle()
-                            .stroke(isSelected ? Color.orange : Color.clear, lineWidth: 2)
-                    )
-
-                Text(shopType.localizedName(language: viewModel.currentLanguage))
-                    .font(.caption)
-                    .fontWeight(isSelected ? .bold : .regular) // 選択中を太字に
-                    .foregroundColor(isSelected ? .orange : .primary) // 選択中の色変更
-                    .frame(height: 30) // テキストの高さを確保して揃える
-            }
-            // タップ時のスケールエフェクト
-            .scaleEffect(isSelected ? 1.1 : 1.0)
-            // 選択変更時のアニメーション
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
-        }
-        .buttonStyle(.plain) // デフォルトのボタンスタイルを解除してカスタムスタイルを適用
     }
 }
 
@@ -560,6 +485,8 @@ struct TopBarView: View {
 struct InitialModeSelectionView: View {
     @ObservedObject var viewModel: GameViewModel
     @Binding var showingCalendar: Bool
+    // ★ 選択されたお店の種類を保持する状態変数 (初期値を修正: .fruit -> .fruitStand)
+    @State private var selectedShopType: ShopType = .fruitStand 
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -578,14 +505,39 @@ struct InitialModeSelectionView: View {
                     Text(viewModel.currentLanguage == "ja" ? "ハッピーショッピング" : "Happy Shopping").font(.system(size: 32, weight: .bold)).foregroundColor(.orange).minimumScaleFactor(0.8).padding(.bottom, 10)
                 }
                 .padding(.horizontal)
+
+                // --- ★ お店タイプ選択UIを追加 --- 
+                VStack(spacing: 12) {
+                    Text(viewModel.currentLanguage == "ja" ? "お店を選ぶ" : "Select Shop Type")
+                        .font(.headline).foregroundColor(.secondary)
+
+                    HStack(alignment: .top, spacing: 15) {
+                        ForEach(ShopType.allCases) { shopType in
+                            // --- 個々のボタン (ViewModelではなくStateを参照するように変更が必要) ---
+                            InitialShopTypeButtonView(
+                                selectedShopType: $selectedShopType, // State を Binding で渡す
+                                shopType: shopType,
+                                language: viewModel.currentLanguage
+                            )
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .padding(.bottom, 20) // モードボタンとの間隔を調整
+
+                // --- モード選択ボタン --- 
                 VStack(spacing: 20) {
+                    // ★ アクションを修正: selectedShopType を ViewModel に設定してからモード開始
                     LargeModeButton(
                         icon: "house.fill",
                         textJA: "おみせやさん",
                         textEN: "Shop Clerk",
                         color: .green,
                         language: viewModel.currentLanguage,
-                        action: { [viewModel] in viewModel.goToShopModeSelection() }
+                        action: { 
+                            viewModel.currentShopType = selectedShopType // ★ 設定
+                            viewModel.goToShopModeSelection() 
+                        }
                     )
                     LargeModeButton(
                         icon: "cart.fill",
@@ -593,7 +545,10 @@ struct InitialModeSelectionView: View {
                         textEN: "Customer",
                         color: .blue,
                         language: viewModel.currentLanguage,
-                        action: { [viewModel] in viewModel.startCustomerMode() }
+                        action: { 
+                            viewModel.currentShopType = selectedShopType // ★ 設定
+                            viewModel.startCustomerMode() 
+                        }
                     )
                     LargeModeButton(
                         icon: "pawprint.fill",
@@ -665,9 +620,85 @@ struct LargeModeButton: View {
     }
 }
 
-// --- ★ 古いプレースホルダービューを削除 --- 
-// struct CustomerModeView: View { ... } // 削除
-// struct AnimalCareView: View { ... } // 削除
+// --- ★ InitialModeSelectionView 用のショップタイプボタンビュー (新規作成) ---
+struct InitialShopTypeButtonView: View {
+    @Binding var selectedShopType: ShopType // ViewModel の代わりに Binding を受け取る
+    let shopType: ShopType
+    let language: String
+
+    // 選択されているかどうかを判定するプロパティ
+    private var isSelected: Bool {
+        selectedShopType == shopType
+    }
+
+    var body: some View {
+        Button {
+            // タップされたら選択中のショップタイプを更新
+            selectedShopType = shopType
+        } label: {
+            VStack(spacing: 5) { 
+                Image(shopType.imageName) 
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 50, height: 50)
+                    .padding(10)
+                    .background(
+                        Circle()
+                            .fill(isSelected ? Color.orange.opacity(0.2) : Color.black.opacity(0.05))
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(isSelected ? Color.orange : Color.clear, lineWidth: 2)
+                    )
+
+                Text(shopType.localizedName(language: language))
+                    .font(.caption)
+                    .fontWeight(isSelected ? .bold : .regular)
+                    .foregroundColor(isSelected ? .orange : .primary)
+                    .frame(height: 30)
+            }
+            .scaleEffect(isSelected ? 1.1 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// --- ★ どうぶつのおへや用プレースホルダービュー (新規作成) ---
+struct AnimalCarePlaceholderView: View {
+    @ObservedObject var viewModel: GameViewModel
+
+    var body: some View {
+        ZStack(alignment: .topLeading) { // 左上にボタンを配置
+            // 背景 (任意)
+            Color.orange.opacity(0.1).ignoresSafeArea()
+
+            // 中央のテキスト
+            VStack {
+                Spacer()
+                Text("どうぶつのおへや")
+                    .font(.largeTitle)
+                    .padding(.bottom, 5)
+                Text("(ここは じゅんびちゅう です)")
+                    .font(.title2)
+                    .foregroundColor(.gray)
+                Spacer()
+                Spacer() // テキストを少し上に
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // 左上の戻るボタン
+            Button {
+                viewModel.returnToModeSelection() // モード選択に戻る
+            } label: {
+                Image(systemName: "chevron.backward.circle.fill")
+                    .font(.largeTitle)
+                    .foregroundColor(.gray)
+                    .padding()
+            }
+        }
+    }
+}
 
 // --- Preview ---
 struct InitialModeSelectionView_Previews: PreviewProvider {

@@ -19,11 +19,12 @@ struct CheckoutView: View {
             }
             .padding()
 
-            Text("お支払い") // 仮タイトル
+            // ★ タイトルをローカライズ
+            Text(viewModel.currentLanguage == "ja" ? "お支払い" : "Checkout") 
                 .font(.largeTitle.bold())
 
-            // 合計金額表示 (★ ViewModelから取得)
-            Text("合計金額: ¥\(calculateCorrectTotal())")
+            // ★ 合計金額表示をローカライズ
+            Text("\(viewModel.currentLanguage == "ja" ? "合計金額" : "Total Amount"): ¥\(calculateCorrectTotal())")
                 .font(.title)
 
             // お金入力UI (仮)
@@ -33,7 +34,8 @@ struct CheckoutView: View {
             Button {
                 viewModel.paymentAmount = 0
             } label: {
-                 Label("ぜんぶもどす", systemImage: "arrow.counterclockwise.circle.fill")
+                // ★ ラベルをローカライズ
+                 Label(viewModel.currentLanguage == "ja" ? "ぜんぶもどす" : "Reset All", systemImage: "arrow.counterclockwise.circle.fill")
                      .font(.title3)
                      .padding(8)
                      .foregroundColor(.white)
@@ -49,7 +51,8 @@ struct CheckoutView: View {
                 viewModel.confirmPayment() // ViewModelの支払い確定メソッドを呼ぶ
                 // 正解なら isPresented が false になって戻る想定 (ViewModel側で制御)
             } label: {
-                Label("これで払う", systemImage: "checkmark.circle.fill")
+                // ★ ラベルをローカライズ
+                Label(viewModel.currentLanguage == "ja" ? "これで払う" : "Pay Now", systemImage: "checkmark.circle.fill")
                     .font(.title2.bold())
                     .padding()
                     .frame(maxWidth: .infinity)
