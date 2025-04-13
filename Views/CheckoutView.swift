@@ -29,6 +29,21 @@ struct CheckoutView: View {
             // お金入力UI (仮)
             MoneyInputView(viewModel: viewModel) // viewModelを渡す
 
+            // リセットボタン
+            Button {
+                viewModel.paymentAmount = 0
+            } label: {
+                 Label("ぜんぶもどす", systemImage: "arrow.counterclockwise.circle.fill")
+                     .font(.title3)
+                     .padding(8)
+                     .foregroundColor(.white)
+                     .background(Color.orange)
+                     .cornerRadius(10)
+                     .shadow(radius: 1)
+            }
+            .disabled(viewModel.paymentAmount == 0)
+            .padding(.bottom)
+
             // 支払い確定ボタン (仮)
             Button {
                 viewModel.confirmPayment() // ViewModelの支払い確定メソッドを呼ぶ
@@ -43,7 +58,6 @@ struct CheckoutView: View {
                     .cornerRadius(15)
             }
             .padding()
-            // 支払い額が0のときは無効化 (任意)
             .disabled(viewModel.paymentAmount == 0)
 
             Spacer()

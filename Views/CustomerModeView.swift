@@ -8,20 +8,53 @@ struct CustomerModeView: View {
     @State private var isCheckingOut = false
 
     var body: some View {
-        VStack {
-            // TopBar は一旦コメントアウト (後で必要か判断)
-            // TopBarView(viewModel: viewModel, showingCalendar: $showingCalendar)
+        ZStack {
+            // 背景色などを設定 (任意)
+            Color.blue.opacity(0.1).ignoresSafeArea()
 
-            // ★ isCheckingOut の状態に応じてビューを切り替え
-            if isCheckingOut {
-                // TODO: CheckoutView を表示 (まだ作成していない)
-                CheckoutView(viewModel: viewModel, isPresented: $isCheckingOut) // 仮
-            } else {
-                // ★ ShoppingListView に isCheckingOut の Binding を渡す
-                ShoppingListView(viewModel: viewModel, isCheckingOut: $isCheckingOut)
+            VStack(spacing: 15) {
+                // MARK: - Header (★ Home Button Added)
+                HStack {
+                    // 左上にホームに戻るボタンを追加
+                    Button {
+                        viewModel.returnToModeSelection() // ホーム画面に戻る
+                    } label: {
+                        Image(systemName: "house.fill")
+                            .font(.title2)
+                            .padding(10)
+                            .background(Circle().fill(Color.white.opacity(0.8)))
+                            .shadow(radius: 2)
+                    }
+                    
+                    Spacer() // スペーサーで左右に要素を分ける
+
+                    // ★ スコア表示を右上に追加 (星アイコンに変更)
+                    HStack(spacing: 4) { // アイコンと数字の間隔を調整
+                        Image(systemName: "star.fill")
+                            .foregroundColor(.yellow)
+                        Text("\(viewModel.currentScore)")
+                    }
+                    .font(.title2)
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.8)))
+                    .shadow(radius: 2)
+
+                    // (既存の言語切り替えボタンなどがあればここ)
+                }
+                .padding(.horizontal)
+                .padding(.top, 5)
+
+                // ★ isCheckingOut の状態に応じてビューを切り替え
+                if isCheckingOut {
+                    // TODO: CheckoutView を表示 (まだ作成していない)
+                    CheckoutView(viewModel: viewModel, isPresented: $isCheckingOut) // 仮
+                } else {
+                    // ★ ShoppingListView に isCheckingOut の Binding を渡す
+                    ShoppingListView(viewModel: viewModel, isCheckingOut: $isCheckingOut)
+                }
+
+                Spacer() // 仮
             }
-
-            Spacer() // 仮
         }
         .onAppear {
             // CustomerMode が表示されたときの初期化処理があればここに追加
@@ -31,7 +64,6 @@ struct CustomerModeView: View {
         }
         // CustomerMode 全体に背景色などを設定しても良いかも
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)]), startPoint: .top, endPoint: .bottom).ignoresSafeArea())
     }
 }
 

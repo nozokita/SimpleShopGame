@@ -49,17 +49,7 @@ struct MoneyInputView: View {
                     }
                 }
             }
-            .padding()
-
-            // 金額リセットボタン (任意)
-             Button {
-                 viewModel.paymentAmount = 0
-             } label: {
-                 Label("リセット", systemImage: "arrow.counterclockwise.circle.fill")
-                     .font(.callout) // 少し小さく
-             }
-             .padding(.top, 5) // 少し上に詰める
-
+            .padding(.horizontal)
         }
     }
 }
