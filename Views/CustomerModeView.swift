@@ -46,31 +46,34 @@ struct CustomerModeView: View {
                     .padding(.horizontal)
                     .padding(.top, 5)
 
-                    // ★ カート表示ビューに置き換え
-                    customerCartView
+                    // ★ Spacer を ProductGridView の前に移動
+                    Spacer()
+                    ProductGridView(viewModel: viewModel)
 
-                    // ★ ボタンを NavigationLink に変更
-                    NavigationLink {
-                        // 遷移先のビュー
-                        CheckoutView(viewModel: viewModel)
-                    } label: {
-                        // ボタンと同じ見た目のラベル
-                        Label(viewModel.currentLanguage == "ja" ? "レジにすすむ" : "Checkout", systemImage: "chevron.right.circle.fill")
-                            .font(.title2.bold())
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color.orange)
-                            .foregroundColor(.white)
-                            .cornerRadius(15)
-                    }
-                    .padding(.horizontal) // 横パディングを追加
-                    .disabled(viewModel.customerCart.isEmpty) // カートが空なら無効
+                    // ★ カート表示とレジボタンをVStackで囲み、間隔を狭める
+                    VStack(spacing: 8) { // ← spacing を 8 に設定
+                        customerCartView
+                        NavigationLink {
+                            // 遷移先のビュー
+                            CheckoutView(viewModel: viewModel)
+                        } label: {
+                            // ボタンと同じ見た目のラベル
+                            Label(viewModel.currentLanguage == "ja" ? "レジにすすむ" : "Checkout", systemImage: "chevron.right.circle.fill")
+                                .font(.title2.bold())
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.orange)
+                                .foregroundColor(.white)
+                                .cornerRadius(15)
+                        }
+                        .padding(.horizontal) // 横パディングを追加
+                        .disabled(viewModel.customerCart.isEmpty) // カートが空なら無効
+                    } // ★ 新しいVStackの閉じ括弧
 
                     Divider()
 
-                    ProductGridView(viewModel: viewModel)
-
-                    Spacer()
+                    // ★ Spacer をここから削除
+                    // Spacer()
                 }
                 .padding() // VStack全体にパディングを追加
             } // ZStack の終わり
