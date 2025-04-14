@@ -980,6 +980,10 @@ class GameViewModel: ObservableObject {
         showFeedbackOverlay = true
         // 正解音？
          correctSoundPlayer?.play()
+         // ★ スコアを加算する
+         currentScore += 1
+         print("Score increased to: \(currentScore)") // デバッグ用ログ
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             self.showFeedbackOverlay = false
             // 画面は paymentSuccessful フラグで閉じるのでここでは何もしない
