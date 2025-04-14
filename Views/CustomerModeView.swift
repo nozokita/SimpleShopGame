@@ -57,7 +57,7 @@ struct CustomerModeView: View {
             }
         }
         // ★ isCheckingOut の変化を監視し、CheckoutViewが閉じた後の処理を追加
-        .onChange(of: isCheckingOut) { newValue in
+        .onChange(of: isCheckingOut) { oldValue, newValue in
             // isCheckingOut が false になった（シートが閉じた）時
             if !newValue {
                 // 支払い成功で閉じられた場合のみ新しいミッションを生成

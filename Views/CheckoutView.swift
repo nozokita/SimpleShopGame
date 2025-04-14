@@ -72,7 +72,7 @@ struct CheckoutView: View {
              viewModel.paymentAmount = 0
         }
         // ★ 支払い成功フラグを監視して画面を閉じる
-        .onChange(of: viewModel.paymentSuccessful) { newValue in
+        .onChange(of: viewModel.paymentSuccessful) { oldValue, newValue in
             if newValue {
                 isPresented = false // 支払い成功時に画面を閉じる
             }
