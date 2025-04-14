@@ -144,13 +144,18 @@ struct GameplayView: View {
             .background(RoundedRectangle(cornerRadius: 15).fill(Color.white.opacity(0.7)))
             .padding(.horizontal)
 
-            Spacer()
+            // ★ Spacer をここから削除
+            // Spacer()
 
             // --- 下部のUI（モードによって切り替え） ---
             VStack {
+                // ★ Spacer を下部 VStack の先頭に移動
+                Spacer()
                 switch viewModel.currentGameMode {
                 case .shopping, .listeningQuiz:
+                    // ★ ProductGridView が高さを最大限取るように修正
                     ProductGridView(viewModel: viewModel)
+                        .frame(maxHeight: .infinity) // ← これを追加
                     UserSelectionView(viewModel: viewModel)
                     SubmitButton(viewModel: viewModel)
                 case .calculationQuiz, .priceQuiz:
