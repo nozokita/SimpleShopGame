@@ -8,77 +8,146 @@ struct CustomerModeView: View {
     @State private var isCheckingOut = false
 
     var body: some View {
-        ZStack {
-            // 背景色などを設定 (任意)
-            Color.blue.opacity(0.1).ignoresSafeArea()
+        // ★ ZStack を NavigationStack で囲む
+        NavigationStack {
+            ZStack {
+                // 背景色などを設定 (任意)
+                Color.blue.opacity(0.1).ignoresSafeArea()
 
-            VStack(spacing: 15) {
-                // MARK: - Header (★ Home Button Added)
-                HStack {
-                    // 左上にホームに戻るボタンを追加
-                    Button {
-                        viewModel.returnToModeSelection() // ホーム画面に戻る
+                VStack(spacing: 15) {
+                    // MARK: - Header (★ Home Button Added)
+                    HStack {
+                        // 左上にホームに戻るボタンを追加
+                        Button {
+                            viewModel.returnToModeSelection() // ホーム画面に戻る
+                        } label: {
+                            Image(systemName: "house.fill")
+                                .font(.title2)
+                                .padding(10)
+                                .background(Circle().fill(Color.white.opacity(0.8)))
+                                .shadow(radius: 2)
+                        }
+                        
+                        Spacer() // スペーサーで左右に要素を分ける
+
+                        // ★ スコア表示を右上に追加 (星アイコンに変更)
+                        HStack(spacing: 4) { // アイコンと数字の間隔を調整
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.yellow)
+                            Text("\(viewModel.currentScore)")
+                        }
+                        .font(.title2)
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.8)))
+                        .shadow(radius: 2)
+
+                        // (既存の言語切り替えボタンなどがあればここ)
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 5)
+
+                    // ★ カート表示ビューに置き換え
+                    customerCartView
+
+                    // ★ ボタンを NavigationLink に変更
+                    NavigationLink {
+                        // 遷移先のビュー
+                        CheckoutView(viewModel: viewModel)
                     } label: {
-                        Image(systemName: "house.fill")
-                            .font(.title2)
-                            .padding(10)
-                            .background(Circle().fill(Color.white.opacity(0.8)))
-                            .shadow(radius: 2)
+                        // ボタンと同じ見た目のラベル
+                        Label(viewModel.currentLanguage == "ja" ? "レジにすすむ" : "Checkout", systemImage: "chevron.right.circle.fill")
+                            .font(.title2.bold())
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(15)
                     }
-                    
-                    Spacer() // スペーサーで左右に要素を分ける
+                    .padding(.horizontal) // 横パディングを追加
+                    .disabled(viewModel.customerCart.isEmpty) // カートが空なら無効
 
-                    // ★ スコア表示を右上に追加 (星アイコンに変更)
-                    HStack(spacing: 4) { // アイコンと数字の間隔を調整
-                        Image(systemName: "star.fill")
-                            .foregroundColor(.yellow)
-                        Text("\(viewModel.currentScore)")
-                    }
-                    .font(.title2)
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.8)))
-                    .shadow(radius: 2)
+                    Divider()
 
-                    // (既存の言語切り替えボタンなどがあればここ)
+                    ProductGridView(viewModel: viewModel)
+
+                    Spacer()
                 }
-                .padding(.horizontal)
-                .padding(.top, 5)
-
-                // ★ isCheckingOut の状態に応じてビューを切り替え
-                if isCheckingOut {
-                    // TODO: CheckoutView を表示 (まだ作成していない)
-                    CheckoutView(viewModel: viewModel, isPresented: $isCheckingOut) // 仮
-                } else {
-                    // ★ ShoppingListView に isCheckingOut の Binding を渡す
-                    ShoppingListView(viewModel: viewModel, isCheckingOut: $isCheckingOut)
-                }
-
-                Spacer() // 仮
-            }
-        }
-        // ★ isCheckingOut の変化を監視し、CheckoutViewが閉じた後の処理を追加
-        .onChange(of: isCheckingOut) { oldValue, newValue in
-            // isCheckingOut が false になった（シートが閉じた）時
-            if !newValue {
-                // 支払い成功で閉じられた場合のみ新しいミッションを生成
-                if viewModel.paymentSuccessful {
-                    print("Checkout successful, generating new mission.")
-                    viewModel.generateShoppingListMission()
-                    viewModel.paymentSuccessful = false // ViewModelのフラグをリセット
-                } else {
-                    // キャンセルボタンなどで閉じられた場合 (何もしないか、特定の処理)
-                    print("Checkout cancelled or closed without payment.")
-                }
-            }
-        }
+                .padding() // VStack全体にパディングを追加
+            } // ZStack の終わり
+        } // NavigationStack の終わり
         .onAppear {
             // CustomerMode が表示されたときの初期化処理があればここに追加
             // ViewModel側で実施済みのため、通常は不要かも
-            // 画面が表示されたときに isCheckingOut をリセットする (任意)
-            isCheckingOut = false
+            // isCheckingOut は NavigationLink で不要になったため削除
         }
         // CustomerMode 全体に背景色などを設定しても良いかも
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // ★ カート表示ビュー (ボタンとSpacerを削除)
+    private var customerCartView: some View {
+        VStack(alignment: .leading) {
+            Text("カート") // ローカライズ対応推奨
+                .font(.headline)
+                .padding(.bottom, 2)
+
+            if viewModel.customerCart.isEmpty {
+                Text("カートは空です") // ローカライズ対応推奨
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 100) // 高さを確保
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(viewModel.customerCart) { item in
+                            HStack {
+                                if let product = viewModel.getProduct(byId: item.productKey) {
+                                    Text(product.nameJA) // 日本語名
+                                    Spacer()
+                                    Text("\(item.quantity) 個") // 個数
+                                    Text("¥\(product.price * item.quantity)") // 合計金額
+                                } else {
+                                    Text("商品不明") // エラーケース
+                                }
+                                // 削除ボタン
+                                Button {
+                                    viewModel.removeFromCustomerCart(item)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(.red)
+                                }
+                                .buttonStyle(.plain) // ボタンのデフォルトスタイルを無効化
+                            }
+                            .padding(.horizontal, 5)
+                        }
+                    }
+                }
+                .frame(maxHeight: 150) // 表示する高さに制限
+
+                // 合計金額
+                HStack {
+                    Spacer()
+                    Text("カート合計:")
+                        .font(.headline)
+                    Text("¥\(calculateCartTotal())")
+                        .font(.title2.weight(.semibold))
+                }
+                .padding(.top, 5)
+            }
+        }
+        .padding()
+        .background(Color.white.opacity(0.7))
+        .cornerRadius(10)
+        .frame(minHeight: 120) // カートが空でも最低限の高さを確保
+    }
+
+    // ★ カート合計計算ヘルパー (変更なし)
+    private func calculateCartTotal() -> Int {
+        viewModel.customerCart.reduce(0) { total, item in
+            if let product = viewModel.getProduct(byId: item.productKey) {
+                return total + (product.price * item.quantity)
+            }
+            return total
+        }
     }
 }
 

@@ -916,15 +916,15 @@ class GameViewModel: ObservableObject {
     }
 
     // カートから商品を減らす、または削除するメソッド (任意で追加)
-    func removeFromCustomerCart(_ product: Product) {
+    func removeFromCustomerCart(_ itemToRemove: OrderItem) {
         // guard customerSubMode == .shoppingList else { return }
-        if let index = customerCart.firstIndex(where: { $0.productKey == product.key }) {
+        if let index = customerCart.firstIndex(where: { $0.id == itemToRemove.id }) {
             if customerCart[index].quantity > 1 {
                 customerCart[index].quantity -= 1
             } else {
                 customerCart.remove(at: index)
             }
-            print("Removed \(product.nameEN) from customer cart. Cart: \(customerCart)")
+            print("Removed \(itemToRemove.productKey) from customer cart. Cart: \(customerCart)")
         }
     }
 
@@ -936,17 +936,19 @@ class GameViewModel: ObservableObject {
     func confirmPayment() {
         // TODO: 正誤判定ロジック
         print("Confirming payment...")
-        guard let shoppingList = currentShoppingList else { 
-            print("Error: Shopping list is nil.")
-            return
-        }
+        // ★ shoppingList ではなく customerCart を使うように変更
+        // guard let shoppingList = currentShoppingList else { 
+        //     print("Error: Shopping list is nil.")
+        //     return
+        // }
 
-        // 正しい合計金額を計算
-        let correctTotal = shoppingList.reduce(0) { total, item in
+        // 正しい合計金額を計算 (★ customerCart を使う)
+        let correctTotal = customerCart.reduce(0) { total, item in // shoppingList を customerCart に変更
             if let product = getProduct(byId: item.productKey) {
                 return total + (product.price * item.quantity)
             }
-            print("Warning: Product not found for key \(item.productKey) in shopping list.")
+            // ★ 警告メッセージも修正
+            print("Warning: Product not found for key \(item.productKey) in customer cart.")
             return total
         }
 
@@ -965,10 +967,11 @@ class GameViewModel: ObservableObject {
     }
 
     // カートと支払いをリセットするヘルパーメソッド
-    private func resetCustomerCartAndPayment() {
+    func resetCustomerCartAndPayment() {
         customerCart = []
         paymentAmount = 0
-        print("Customer cart and payment reset.")
+        paymentSuccessful = false
+        objectWillChange.send() // UI更新のために通知
     }
 
     // 正解フィードバック表示と次のミッション生成 (仮) -> (★ 修正: 次のミッション生成は削除)

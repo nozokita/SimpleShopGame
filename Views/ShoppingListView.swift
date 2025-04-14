@@ -78,7 +78,7 @@ struct CustomerCartView: View {
     let cart: [OrderItem]
     let language: String
     let getProduct: (String) -> Product?
-    let removeFromCartAction: (Product) -> Void // 削除アクションを追加
+    let removeFromCartAction: (OrderItem) -> Void // 削除アクションを追加
 
     var body: some View {
          VStack(alignment: .leading, spacing: 5) {
@@ -95,7 +95,7 @@ struct CustomerCartView: View {
                              Text("¥\(product.price * item.quantity)")
                              // 削除ボタンを追加
                              Button {
-                                 removeFromCartAction(product)
+                                 removeFromCartAction(item)
                              } label: {
                                  Image(systemName: "minus.circle.fill")
                                      .foregroundColor(.red)

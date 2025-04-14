@@ -2,7 +2,7 @@ import SwiftUI
 
 struct CheckoutView: View {
     @ObservedObject var viewModel: GameViewModel
-    @Binding var isPresented: Bool // CustomerModeViewのisCheckingOutと連動
+    @Environment(\.dismiss) var dismiss
 
     var body: some View {
         VStack(spacing: 20) {
@@ -10,7 +10,7 @@ struct CheckoutView: View {
             HStack {
                 Spacer()
                 Button {
-                    isPresented = false // このビューを閉じる
+                    dismiss()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.largeTitle)
@@ -74,15 +74,16 @@ struct CheckoutView: View {
         // ★ 支払い成功フラグを監視して画面を閉じる
         .onChange(of: viewModel.paymentSuccessful) { oldValue, newValue in
             if newValue {
-                isPresented = false // 支払い成功時に画面を閉じる
+                // ★ dismiss する前にカートと支払いをリセット
+                viewModel.resetCustomerCartAndPayment()
+                dismiss()
             }
         }
     }
 
     // ★ 合計金額を計算するヘルパー関数
     private func calculateCorrectTotal() -> Int {
-        guard let shoppingList = viewModel.currentShoppingList else { return 0 }
-        return shoppingList.reduce(0) { total, item in
+        return viewModel.customerCart.reduce(0) { total, item in
             if let product = viewModel.getProduct(byId: item.productKey) {
                 return total + (product.price * item.quantity)
             }
@@ -93,8 +94,6 @@ struct CheckoutView: View {
 
 // --- Preview ---
 struct CheckoutView_Previews: PreviewProvider {
-    @State static var isPresentedPreview = true
-
     // プレビュー用に設定済みのViewModelを生成するヘルパー
     static var configuredViewModel: GameViewModel {
         let vm = GameViewModel()
@@ -108,8 +107,7 @@ struct CheckoutView_Previews: PreviewProvider {
     static var previews: some View {
         // ヘルパーを使ってViewModelを取得し、CheckoutViewを返す
         CheckoutView(
-            viewModel: configuredViewModel,
-            isPresented: $isPresentedPreview
+            viewModel: configuredViewModel
         )
     }
 } 
