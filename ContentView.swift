@@ -87,15 +87,10 @@ struct ContentView: View {
                 GameplayView(viewModel: viewModel, showingCalendar: $showingCalendar)
                     .transition(.opacity.animation(.easeInOut))
             case .playingCustomer:
-                // ★ CustomerModeView を表示するように修正
                 CustomerModeView(viewModel: viewModel, showingCalendar: $showingCalendar)
                     .transition(.opacity.animation(.easeInOut))
             case .animalCare:
-                // ★ AnimalCareView が削除されたため、一時的にText表示にする -> Placeholder View に変更
-                // Text("どうぶつのおへや (実装中)")
-                //     .font(.largeTitle)
-                //     .transition(.opacity.animation(.easeInOut))
-                AnimalCarePlaceholderView(viewModel: viewModel) // ★ Placeholder View を表示
+                AnimalCareView(viewModel: viewModel)
                     .transition(.opacity.animation(.easeInOut))
             case .result:
                 ResultView(viewModel: viewModel)
