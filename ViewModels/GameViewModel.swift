@@ -27,6 +27,28 @@ enum GameMode: CaseIterable {
     case listeningQuiz // リスニングクイズモード (追加)
 }
 
+// 効果音の種類を表すEnum
+enum SoundEffect {
+    case correct
+    case incorrect
+    case itemSelect
+    case orderNew
+    
+    // サウンドファイル名を返す
+    var fileName: String {
+        switch self {
+        case .correct:
+            return "success"
+        case .incorrect:
+            return "failure"
+        case .itemSelect:
+            return "success" // success.mp3を流用
+        case .orderNew:
+            return "success" // success.mp3を流用
+        }
+    }
+}
+
 // 時間制限の選択肢 (追加)
 enum TimeLimitOption: Double, CaseIterable, Identifiable {
     case short = 30.0
@@ -57,6 +79,11 @@ class GameViewModel: ObservableObject {
     // MARK: - Game Mode
     @Published var currentGameMode: GameMode = .shopping
     @Published var currentShopType: ShopType = .fruitStand // 現在の店タイプ (初期値を修正)
+
+    // MARK: - Animal Care Properties
+    @Published var puppyHunger: Double = 50
+    @Published var puppyHappiness: Double = 50
+    @Published var lastAnimalCareTime: Date = Date()
 
     // MARK: - Customer Mode Properties (追加)
     @Published var customerSubMode: CustomerSubMode = .shoppingList
@@ -194,11 +221,19 @@ class GameViewModel: ObservableObject {
         // itemSelectSoundPlayer = loadSound(fileName: "success") // <<< 削除
     }
 
+    /// 効果音を再生するメソッド
+    func playSoundEffect(_ effect: SoundEffect) {
+        let soundFileName = effect.fileName
+        let player = loadSound(fileName: soundFileName)
+        player?.currentTime = 0
+        player?.play()
+    }
+
     /// 指定されたファイル名の音声ファイルをロードしてAVAudioPlayerを生成する
     private func loadSound(fileName: String) -> AVAudioPlayer? {
         // mp3形式を想定
-        guard let soundURL = Bundle.main.url(forResource: fileName, withExtension: "mp3") else {
-            print("Error: Sound file \(fileName).mp3 not found.")
+        guard let soundURL = Bundle.main.url(forResource: fileName, withExtension: "mp3", subdirectory: "Sounds") else {
+            print("Error: Sound file \(fileName).mp3 not found in Sounds directory.")
             return nil
         }
 
@@ -320,6 +355,7 @@ class GameViewModel: ObservableObject {
             currentOrder = generateShoppingOrder()
         }
         print("Generated new order: \(currentOrder?.items ?? [])")
+        playSoundEffect(.orderNew) // 注文生成時の効果音を再生
         speakPrompt() // 注文生成後に読み上げ
     }
 
@@ -460,6 +496,9 @@ class GameViewModel: ObservableObject {
         userSelection[product.key] = currentCount + 1
         print("User selected: \(product.key), new count: \(userSelection[product.key]!)")
 
+        // アイテム選択時の効果音を再生
+        playSoundEffect(.itemSelect)
+
         // --- タッチフィードバック用 --- 
         tappedProductKey = product.key // タップされたキーを記録
         // 少し遅れて解除
@@ -523,8 +562,7 @@ class GameViewModel: ObservableObject {
     private func handleCorrectSubmission() {
         print("Submission Correct! Score: \(currentScore + 1)")
         currentScore += 1 // スコアをインクリメント (追加)
-        correctSoundPlayer?.currentTime = 0
-        correctSoundPlayer?.play()
+        playSoundEffect(.correct)
 
         feedbackIsCorrect = true
         showFeedbackOverlay = true
@@ -543,8 +581,7 @@ class GameViewModel: ObservableObject {
     private func handleIncorrectSubmission() {
         print("Submission Incorrect! Mistakes: \(mistakeCount + 1)")
         mistakeCount += 1
-        incorrectSoundPlayer?.currentTime = 0
-        incorrectSoundPlayer?.play()
+        playSoundEffect(.incorrect)
         feedbackIsCorrect = false
         showFeedbackOverlay = true
 
@@ -1060,5 +1097,42 @@ class GameViewModel: ObservableObject {
         }
         print("Speaking text ([\(self.currentLanguage)]): \(text)")
         speechSynthesizer.speak(utterance)
+    }
+
+    // MARK: - Animal Care Methods
+    /// 子犬に餌をあげる - 満腹度と機嫌が上がる
+    func feedPuppy() {
+        // お腹と機嫌を増加させる（最大100まで）
+        puppyHunger = min(puppyHunger + 20, 100)
+        puppyHappiness = min(puppyHappiness + 10, 100)
+        lastAnimalCareTime = Date()
+        
+        // 音を鳴らす
+        playSoundEffect(.correct)
+    }
+    
+    /// 子犬と遊ぶ - 機嫌が上がるが満腹度が少し下がる
+    func playWithPuppy() {
+        // 機嫌を増加させる、お腹は少し減る
+        puppyHappiness = min(puppyHappiness + 25, 100)
+        puppyHunger = max(puppyHunger - 5, 0)
+        lastAnimalCareTime = Date()
+        
+        // 音を鳴らす
+        playSoundEffect(.correct)
+    }
+    
+    /// 子犬の状態を時間経過に応じて更新する
+    func updatePuppyStatus() {
+        // 前回のお世話からの経過時間に基づいてステータスを更新
+        let elapsedSeconds = Date().timeIntervalSince(lastAnimalCareTime)
+        let hoursElapsed = elapsedSeconds / 3600
+        
+        // 1時間ごとにお腹と機嫌が減少する（減少率は調整可能）
+        let hungerDecrease = min(hoursElapsed * 5, puppyHunger)
+        let happinessDecrease = min(hoursElapsed * 10, puppyHappiness)
+        
+        puppyHunger = max(puppyHunger - hungerDecrease, 0)
+        puppyHappiness = max(puppyHappiness - happinessDecrease, 0)
     }
 } 
