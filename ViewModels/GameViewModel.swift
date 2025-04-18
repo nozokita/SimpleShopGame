@@ -1159,4 +1159,5 @@ class GameViewModel: ObservableObject {
     // 子犬アニメーションの状態管理
     @Published var showEatingAnimation: Bool = false
     @Published var showPlayingAnimation: Bool = false
+    @Published var showPettingAnimation: Bool = false
 } 

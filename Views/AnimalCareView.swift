@@ -262,6 +262,17 @@ struct AnimalCareView: View {
         viewModel.puppyHappiness = min(viewModel.puppyHappiness + 5, 100)
         viewModel.lastAnimalCareTime = Date()
         
+        // 撫でるアニメーションを表示
+        viewModel.showPettingAnimation = true
+        
+        // 少し経ったらリセット
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            viewModel.showPettingAnimation = false
+        }
+        
+        // 音を鳴らす
+        viewModel.playSoundEffect(.correct)
+        
         // ハプティックフィードバック
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.impactOccurred()

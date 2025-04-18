@@ -11,6 +11,7 @@ enum PuppyState {
     case happy      // 嬉しい
     case sad        // 悲しい
     case hungry     // お腹が空いている
+    case petting    // 撫でられている
 }
 
 struct PuppyAnimationView: View {
@@ -69,6 +70,11 @@ struct PuppyAnimationView: View {
                 showPlayingAnimation()
             }
         }
+        .onChange(of: viewModel.showPettingAnimation) { _, isPetting in
+            if isPetting {
+                showPettingAnimation()
+            }
+        }
     }
     
     // 現在の状態に応じた画像名を取得
@@ -97,6 +103,8 @@ struct PuppyAnimationView: View {
                     return "puppy_sad_1"
                 case .hungry:
                     return "puppy_hungry_1"
+                case .petting:
+                    return "puppy_pet"
                 case .walking:
                     if walkingDirection > 0 {
                         return "puppy_walk_l1"
@@ -192,6 +200,14 @@ struct PuppyAnimationView: View {
                     _customImageName = nil
                 }
                 
+            case .petting:
+                // 撫でられている状態（約3秒）
+                idleCounter += 1
+                if idleCounter > 10 { // 約3秒後
+                    idleCounter = 0
+                    currentState = .happy // 撫でた後は嬉しい状態に
+                }
+                
             case .sleeping, .happy, .sad, .hungry:
                 // その他の状態は一定時間経過後に戻る
                 idleCounter += 1
@@ -228,8 +244,8 @@ struct PuppyAnimationView: View {
     
     // 子犬を撫でる
     private func petPuppy() {
-        // 撫でられたら喜ぶ
-        currentState = .happy
+        // 撫でられた状態にする
+        currentState = .petting
         idleCounter = 0
         
         // バウンスアニメーション
@@ -302,6 +318,20 @@ struct PuppyAnimationView: View {
         
         // タイマーを即時起動
         timer.fire()
+    }
+    
+    // 撫でるアニメーション
+    private func showPettingAnimation() {
+        print("✋ 撫でるアニメーション開始")
+        // 撫でられた状態にする
+        currentState = .petting
+        idleCounter = 0
+        
+        // バウンスアニメーション
+        shouldBounce = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            shouldBounce = false
+        }
     }
 }
 
