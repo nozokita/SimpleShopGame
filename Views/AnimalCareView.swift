@@ -23,13 +23,8 @@ struct AnimalCareView: View {
                 Image(viewModel.isDaytime ? "bg_room_day_portrait" : "bg_room_night_portrait")
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(
-                        width: max(geometry.size.width, geometry.size.height * 0.5625), // 16:9のアスペクト比を考慮
-                        height: geometry.size.height
-                    )
-                    .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
-                    .clipped()
-                    .ignoresSafeArea()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .edgesIgnoringSafeArea(.all)
                     .animation(.easeInOut(duration: 1.0), value: viewModel.isDaytime)
                 
                 VStack(spacing: 16) {
