@@ -215,7 +215,7 @@ struct AnimalCareView: View {
                     Spacer(minLength: 30)
                     
                     // アクションパネル
-                    VStack(spacing: 8) {
+                    VStack(spacing: 4) {
                         // パネルヘッダー
                         HStack {
                             Text("アクション")
@@ -224,20 +224,20 @@ struct AnimalCareView: View {
                             Spacer()
                         }
                         .padding(.horizontal, 14)
-                        .padding(.top, 12)
-                        .padding(.bottom, 6)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
                         
                         Divider()
                             .background(Color(hex: 0xE0E0E0))
                             .padding(.horizontal, 8)
+                            .padding(.bottom, 2)
                         
                         // アクションボタングリッド
-                        HStack(spacing: 12) {
+                        HStack(spacing: 20) {
                             // 餌やりボタン
                             ActionButton(
                                 action: { feedAction() },
-                                iconName: "cup.and.saucer.fill",
-                                label: "ごはん",
+                                imageName: "icon_feed",
                                 color: Color(hex: 0xFF9800),
                                 isDisabled: viewModel.puppyHunger >= 90
                             )
@@ -245,8 +245,7 @@ struct AnimalCareView: View {
                             // 遊ぶボタン
                             ActionButton(
                                 action: { playAction() },
-                                iconName: "figure.play",
-                                label: "あそぶ",
+                                imageName: "icon_play",
                                 color: Color(hex: 0x4CAF50),
                                 isDisabled: viewModel.puppyHappiness >= 90
                             )
@@ -254,8 +253,7 @@ struct AnimalCareView: View {
                             // 撫でるボタン
                             ActionButton(
                                 action: { petAction() },
-                                iconName: "hand.raised.fill",
-                                label: "なでる",
+                                imageName: "icon_pet",
                                 color: Color(hex: 0x9C27B0),
                                 isDisabled: false
                             )
@@ -263,14 +261,13 @@ struct AnimalCareView: View {
                             // トイレボタン
                             ActionButton(
                                 action: { cleanToiletAction() },
-                                iconName: "sparkles",
-                                label: "トイレ",
+                                imageName: "icon_clean",
                                 color: Color(hex: 0x2196F3),
                                 isDisabled: viewModel.poopCount == 0
                             )
                         }
                         .padding(.horizontal, 14)
-                        .padding(.bottom, 12)
+                        .padding(.vertical, 10)
                     }
                     .background(
                         RoundedRectangle(cornerRadius: 16)
@@ -442,45 +439,26 @@ struct AnimalCareView: View {
     }
 }
 
-// アクションボタンコンポーネント
+// アクションボタンコンポーネント（新しいカスタムアイコン用に修正）
 struct ActionButton: View {
     var action: () -> Void
-    var iconName: String
-    var label: String
+    var imageName: String
     var color: Color
     var isDisabled: Bool
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: iconName)
-                    .font(.system(size: 18))
-                    .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .background(
-                        ZStack {
-                            Circle()
-                                .fill(isDisabled ? Color.gray.opacity(0.5) : color)
-                                .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
-                            
-                            // 外側の輝きエフェクト
-                            Circle()
-                                .stroke(Color.white.opacity(0.5), lineWidth: 1)
-                        }
-                    )
-                
-                Text(label)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundColor(isDisabled ? Color.gray : Color(hex: 0x5D4037))
-            }
-            .padding(.vertical, 3)
-            .contentShape(Rectangle())
-            // タップエフェクト
-            .scaleEffect(isDisabled ? 1.0 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDisabled)
+            Image(imageName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 54, height: 54)
+                .opacity(isDisabled ? 0.5 : 1.0)
+                .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(isDisabled)
+        .scaleEffect(isDisabled ? 0.9 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDisabled)
     }
 }
 
