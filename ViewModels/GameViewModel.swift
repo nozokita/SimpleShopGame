@@ -1154,10 +1154,61 @@ class GameViewModel: ObservableObject {
         
         puppyHunger = max(puppyHunger - hungerDecrease, 0)
         puppyHappiness = max(puppyHappiness - happinessDecrease, 0)
+        
+        // うんちの数も計算
+        calculatePoops()
     }
 
     // 子犬アニメーションの状態管理
     @Published var showEatingAnimation: Bool = false
     @Published var showPlayingAnimation: Bool = false
     @Published var showPettingAnimation: Bool = false
+    
+    // うんち関連の状態管理
+    @Published var poopCount: Int = 0
+    @Published var lastPoopTime: Date = Date().addingTimeInterval(-3600) // 1時間前
+    @Published var showCleaningAnimation: Bool = false
+    
+    /// うんちの数を計算する - 一定時間経過ごとにうんちが増える
+    func calculatePoops() {
+        // 前回のお掃除からの経過時間に基づいてうんちの数を計算
+        let elapsedSeconds = Date().timeIntervalSince(lastPoopTime)
+        // 30分ごとにうんちが1つ増える（お腹が空いている場合より増える）
+        let basePoopInterval: TimeInterval = 30 * 60 // 30分
+        let hungerFactor = max(1.0, 2.0 - (Double(puppyHunger) / 100.0)) // お腹が空いているほど頻度が上がる
+        let intervalAdjusted = basePoopInterval / hungerFactor
+        
+        let newPoops = Int(elapsedSeconds / intervalAdjusted)
+        if newPoops > 0 {
+            // 最大10個まで
+            poopCount = min(poopCount + newPoops, 10)
+            // 最後のうんち時間を更新（未来にならないように現在時刻を基準）
+            lastPoopTime = Date()
+        }
+    }
+    
+    /// うんちを掃除する
+    func cleanPoops() {
+        // うんちがない場合は何もしない
+        guard poopCount > 0 else { return }
+        
+        // うんちを0にする
+        poopCount = 0
+        // 最後の掃除時間を更新
+        lastPoopTime = Date()
+        
+        // 掃除アニメーション指示
+        showCleaningAnimation = true
+        
+        // 2秒後にリセット
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.showCleaningAnimation = false
+        }
+        
+        // 掃除すると機嫌が上がる
+        puppyHappiness = min(puppyHappiness + 5, 100)
+        
+        // 音を鳴らす
+        playSoundEffect(.correct)
+    }
 } 

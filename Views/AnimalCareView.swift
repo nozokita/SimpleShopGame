@@ -162,13 +162,13 @@ struct AnimalCareView: View {
                             isDisabled: false
                         )
                         
-                        // ミニゲームボタン
+                        // トイレボタン
                         ActionButton(
-                            action: { miniGameAction() },
-                            iconName: "gamecontroller.fill",
-                            label: "ゲーム",
+                            action: { cleanToiletAction() },
+                            iconName: "sparkles",
+                            label: "トイレ",
                             color: Color(hex: 0x2196F3),
-                            isDisabled: false
+                            isDisabled: viewModel.poopCount == 0
                         )
                     }
                     .padding(.bottom, 30)
@@ -177,6 +177,23 @@ struct AnimalCareView: View {
             .onAppear {
                 // 画面表示時に子犬のステータスを更新
                 viewModel.updatePuppyStatus()
+                // うんちの数も計算
+                viewModel.calculatePoops()
+                
+                // うんちが3つ以上ある場合はメッセージを表示
+                if viewModel.poopCount >= 3 {
+                    withAnimation {
+                        showStatusMessage = true
+                        statusMessage = "トイレを掃除してね..."
+                    }
+                    
+                    // 3秒後にメッセージを非表示
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        withAnimation {
+                            showStatusMessage = false
+                        }
+                    }
+                }
             }
         }
     }
@@ -285,17 +302,19 @@ struct AnimalCareView: View {
         }
     }
     
-    // ミニゲームアクション
-    private func miniGameAction() {
-        // ミニゲーム表示（今後実装）
+    // トイレ掃除アクション
+    private func cleanToiletAction() {
+        // うんちがない場合は無効
+        guard viewModel.poopCount > 0 else { return }
+        
+        // アニメーション
         withAnimation {
             showStatusMessage = true
-            statusMessage = "また今度ね！"
+            statusMessage = "きれいになった！"
         }
         
-        // ハプティックフィードバック
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
+        // ViewModel更新
+        viewModel.cleanPoops()
         
         // メッセージ非表示
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {

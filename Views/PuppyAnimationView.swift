@@ -26,11 +26,40 @@ struct PuppyAnimationView: View {
     @State private var showFood: Bool = false
     @State private var foodPosition: CGPoint = CGPoint(x: 0, y: 0)
     
+    // うんち関連の状態管理
+    @State private var poopPositions: [CGPoint] = []
+    @State private var lastPoopCount: Int = 0
+    @State private var showCleaning: Bool = false
+    
     // 親ビューから渡されるサイズ
     var size: CGSize
     
     var body: some View {
         ZStack {
+            // うんち画像（ある場合に表示）
+            ForEach(0..<poopPositions.count, id: \.self) { index in
+                if index < poopPositions.count {
+                    Image("poop")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 40)
+                        .position(poopPositions[index])
+                        .opacity(showCleaning ? 0 : 1) // 掃除中は非表示
+                        .animation(.easeOut(duration: 0.5), value: showCleaning)
+                }
+            }
+            
+            // 掃除効果（キラキラエフェクト）
+            if showCleaning {
+                ForEach(0..<poopPositions.count, id: \.self) { index in
+                    if index < poopPositions.count {
+                        Text("✨")
+                            .font(.system(size: 30))
+                            .position(poopPositions[index])
+                    }
+                }
+            }
+            
             // 食べ物画像（条件付きで表示）
             if showFood {
                 Image("food")
@@ -56,6 +85,8 @@ struct PuppyAnimationView: View {
         }
         .onAppear {
             startAnimation()
+            // 初期うんち生成
+            updatePoopDisplay()
         }
         .onDisappear {
             timerCancellable?.cancel()
@@ -73,6 +104,20 @@ struct PuppyAnimationView: View {
         .onChange(of: viewModel.showPettingAnimation) { _, isPetting in
             if isPetting {
                 showPettingAnimation()
+            }
+        }
+        .onChange(of: viewModel.showCleaningAnimation) { _, isCleaning in
+            if isCleaning {
+                showCleaningAnimation()
+            }
+        }
+        .onChange(of: viewModel.poopCount) { _, count in
+            // うんちの数が変化したら表示を更新
+            updatePoopDisplay()
+            
+            // うんちの数が変わったら状態も再計算
+            if count >= 3 && (currentState != .eating && currentState != .playing && currentState != .petting) {
+                currentState = determineState()
             }
         }
     }
@@ -130,6 +175,11 @@ struct PuppyAnimationView: View {
         
         // 機嫌が悪い場合
         if viewModel.puppyHappiness < 20 {
+            return .sad
+        }
+        
+        // うんちが3つ以上貯まっている場合
+        if viewModel.poopCount >= 3 {
             return .sad
         }
         
@@ -331,6 +381,42 @@ struct PuppyAnimationView: View {
         shouldBounce = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             shouldBounce = false
+        }
+    }
+    
+    // うんちの表示を更新
+    private func updatePoopDisplay() {
+        // 現在のうんちの数を取得
+        let count = viewModel.poopCount
+        
+        // うんちが増えた場合は新しいうんちを追加
+        if count > poopPositions.count {
+            for _ in poopPositions.count..<count {
+                // ランダムな位置にうんちを配置
+                let randomX = CGFloat.random(in: 50..<size.width-50)
+                let randomY = CGFloat.random(in: size.height-100..<size.height-20)
+                poopPositions.append(CGPoint(x: randomX, y: randomY))
+            }
+        }
+        // うんちが減った場合は配列を切り詰める
+        else if count < poopPositions.count {
+            poopPositions = Array(poopPositions.prefix(count))
+        }
+        
+        // 現在のうんちの数を記録
+        lastPoopCount = count
+    }
+    
+    // 掃除アニメーション
+    private func showCleaningAnimation() {
+        print("🧹 掃除アニメーション開始")
+        showCleaning = true
+        
+        // 2秒後にエフェクトを消す
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.showCleaning = false
+            // うんちの配列をクリア
+            self.poopPositions = []
         }
     }
 }
