@@ -1119,12 +1119,24 @@ class GameViewModel: ObservableObject {
         playSoundEffect(.correct)
     }
     
-    /// 子犬と遊ぶ - 機嫌が上がるが満腹度が少し下がる
+    /// 子犬と遊ぶ
     func playWithPuppy() {
-        // 機嫌を増加させる、お腹は少し減る
+        // 機嫌が大幅上昇（最大100）
         puppyHappiness = min(puppyHappiness + 25, 100)
+        
+        // 満腹度が少し減少（最小0）
         puppyHunger = max(puppyHunger - 5, 0)
+        
+        // ケア時間を更新
         lastAnimalCareTime = Date()
+        
+        // アニメーション指示
+        showPlayingAnimation = true
+        
+        // 3秒後にリセット（長めに表示）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            self.showPlayingAnimation = false
+        }
         
         // 音を鳴らす
         playSoundEffect(.correct)

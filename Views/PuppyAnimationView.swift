@@ -59,12 +59,12 @@ struct PuppyAnimationView: View {
         .onDisappear {
             timerCancellable?.cancel()
         }
-        .onChange(of: viewModel.showEatingAnimation) { isEating in
+        .onChange(of: viewModel.showEatingAnimation) { _, isEating in
             if isEating {
                 showEatingAnimation()
             }
         }
-        .onChange(of: viewModel.showPlayingAnimation) { isPlaying in
+        .onChange(of: viewModel.showPlayingAnimation) { _, isPlaying in
             if isPlaying {
                 showPlayingAnimation()
             }
@@ -73,36 +73,45 @@ struct PuppyAnimationView: View {
     
     // 現在の状態に応じた画像名を取得
     private var currentImageName: String {
-        switch currentState {
-            case .idle:
-                // 歩行アニメーション：方向に応じた画像を表示（フレーム1のみ）
-                if walkingDirection > 0 {
-                    // 右に移動する時は左向きの画像
-                    return "puppy_walk_l1"
-                } else {
-                    // 左に移動する時は右向きの画像
-                    return "puppy_walk_r1"
-                }
-            case .eating:
-                return "puppy_eating_1"
-            case .playing:
-                return "puppy_playing_1"
-            case .sleeping:
-                return "puppy_sleeping_1"
-            case .happy:
-                return "puppy_happy_1"
-            case .sad:
-                return "puppy_sad_1"
-            case .hungry:
-                return "puppy_hungry_1"
-            case .walking:
-                if walkingDirection > 0 {
-                    return "puppy_walk_l1"
-                } else {
-                    return "puppy_walk_r1"
-                }
+        get {
+            switch currentState {
+                case .idle:
+                    // 歩行アニメーション：方向に応じた画像を表示（フレーム1のみ）
+                    if walkingDirection > 0 {
+                        // 右に移動する時は左向きの画像
+                        return "puppy_walk_l1"
+                    } else {
+                        // 左に移動する時は右向きの画像
+                        return "puppy_walk_r1"
+                    }
+                case .eating:
+                    return "puppy_eating_1"
+                case .playing:
+                    // カスタムアニメーションで制御
+                    return _customImageName ?? "puppy_playing_1"
+                case .sleeping:
+                    return "puppy_sleeping_1"
+                case .happy:
+                    return "puppy_happy_1"
+                case .sad:
+                    return "puppy_sad_1"
+                case .hungry:
+                    return "puppy_hungry_1"
+                case .walking:
+                    if walkingDirection > 0 {
+                        return "puppy_walk_l1"
+                    } else {
+                        return "puppy_walk_r1"
+                    }
+            }
+        }
+        set {
+            _customImageName = newValue
         }
     }
+    
+    // カスタム画像名を保持するプロパティ
+    @State private var _customImageName: String? = nil
     
     // 状態決定ロジック
     private func determineState() -> PuppyState {
@@ -174,7 +183,16 @@ struct PuppyAnimationView: View {
                     showFood = false
                 }
                 
-            case .playing, .sleeping, .happy, .sad, .hungry:
+            case .playing:
+                // 遊び状態は長めに維持（約6秒）
+                idleCounter += 1
+                if idleCounter > 20 { // 約6秒後
+                    idleCounter = 0
+                    currentState = determineState()
+                    _customImageName = nil
+                }
+                
+            case .sleeping, .happy, .sad, .hungry:
                 // その他の状態は一定時間経過後に戻る
                 idleCounter += 1
                 if idleCounter > 10 { // 約3秒後
@@ -252,8 +270,38 @@ struct PuppyAnimationView: View {
     
     // 遊びアニメーション
     private func showPlayingAnimation() {
+        print("🎮 遊びアニメーション開始")
+        // 遊び状態に変更
         currentState = .playing
         idleCounter = 0
+        
+        // 遊びアニメーション - 画像を交互に切り替える
+        animatePlayingImages()
+    }
+    
+    // 遊びアニメーション - 画像を交互に切り替える
+    private func animatePlayingImages() {
+        var counter = 0
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { timer in
+            // 状態が変わったらアニメーション停止
+            if self.currentState != .playing {
+                timer.invalidate()
+                return
+            }
+            
+            // playing_1とplaying_2を交互に表示
+            counter += 1
+            let suffix = counter % 2 == 0 ? "2" : "1"
+            self._customImageName = "puppy_playing_\(suffix)"
+            
+            // 最大10回（約3秒）で停止
+            if counter >= 10 {
+                timer.invalidate()
+            }
+        }
+        
+        // タイマーを即時起動
+        timer.fire()
     }
 }
 
