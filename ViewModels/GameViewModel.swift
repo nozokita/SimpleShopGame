@@ -81,8 +81,8 @@ class GameViewModel: ObservableObject {
     @Published var currentShopType: ShopType = .fruitStand // 現在の店タイプ (初期値を修正)
 
     // MARK: - Animal Care Properties
-    @Published var puppyHunger: Double = 50
-    @Published var puppyHappiness: Double = 50
+    @Published var puppyHunger: Double = 80
+    @Published var puppyHappiness: Double = 80
     @Published var lastAnimalCareTime: Date = Date()
 
     // MARK: - Customer Mode Properties (追加)
@@ -1107,6 +1107,14 @@ class GameViewModel: ObservableObject {
         puppyHappiness = min(puppyHappiness + 10, 100)
         lastAnimalCareTime = Date()
         
+        // アニメーション指示
+        showEatingAnimation = true
+        
+        // 3秒後にリセット（もっと長い時間表示するため）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            self.showEatingAnimation = false
+        }
+        
         // 音を鳴らす
         playSoundEffect(.correct)
     }
@@ -1135,4 +1143,8 @@ class GameViewModel: ObservableObject {
         puppyHunger = max(puppyHunger - hungerDecrease, 0)
         puppyHappiness = max(puppyHappiness - happinessDecrease, 0)
     }
+
+    // 子犬アニメーションの状態管理
+    @Published var showEatingAnimation: Bool = false
+    @Published var showPlayingAnimation: Bool = false
 } 

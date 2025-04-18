@@ -4,7 +4,6 @@ struct AnimalCareView: View {
     @ObservedObject var viewModel: GameViewModel
     @State private var showStatusMessage: Bool = false
     @State private var statusMessage: String = ""
-    @State private var puppyRef: PuppyAnimationView? = nil
     @State private var showMiniGame: Bool = false
     
     // 画面サイズ取得用
@@ -219,7 +218,7 @@ struct AnimalCareView: View {
             statusMessage = "もぐもぐ♪"
         }
         
-        // ViewModel更新
+        // ViewModel更新（ViewModelのメソッドでアニメーション制御も行う）
         viewModel.feedPuppy()
         
         // メッセージ非表示

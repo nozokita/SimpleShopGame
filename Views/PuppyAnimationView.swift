@@ -22,12 +22,23 @@ struct PuppyAnimationView: View {
     @State private var timerCancellable: Cancellable? = nil
     @State private var idleCounter: Int = 0
     @State private var shouldBounce: Bool = false
+    @State private var showFood: Bool = false
+    @State private var foodPosition: CGPoint = CGPoint(x: 0, y: 0)
     
     // 親ビューから渡されるサイズ
     var size: CGSize
     
     var body: some View {
         ZStack {
+            // 食べ物画像（条件付きで表示）
+            if showFood {
+                Image("food")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 60)
+                    .position(foodPosition)
+            }
+            
             // 子犬画像
             Image(currentImageName)
                 .resizable()
@@ -47,6 +58,16 @@ struct PuppyAnimationView: View {
         }
         .onDisappear {
             timerCancellable?.cancel()
+        }
+        .onChange(of: viewModel.showEatingAnimation) { isEating in
+            if isEating {
+                showEatingAnimation()
+            }
+        }
+        .onChange(of: viewModel.showPlayingAnimation) { isPlaying in
+            if isPlaying {
+                showPlayingAnimation()
+            }
         }
     }
     
@@ -142,7 +163,18 @@ struct PuppyAnimationView: View {
                     currentState = determineState()
                 }
                 
-            case .eating, .playing, .sleeping, .happy, .sad, .hungry:
+            case .eating:
+                // 食事状態は長めに維持（約6秒）
+                idleCounter += 1
+                if idleCounter > 20 { // 約6秒後
+                    idleCounter = 0
+                    currentState = determineState()
+                    
+                    // 食事が終わったら食べ物を非表示
+                    showFood = false
+                }
+                
+            case .playing, .sleeping, .happy, .sad, .hungry:
                 // その他の状態は一定時間経過後に戻る
                 idleCounter += 1
                 if idleCounter > 10 { // 約3秒後
@@ -197,13 +229,29 @@ struct PuppyAnimationView: View {
     }
     
     // 食事アニメーション
-    func showEatingAnimation() {
+    private func showEatingAnimation() {
+        print("🍖 食事アニメーション開始: 食べ物表示")
+        // 食べ物を表示
+        showFood = true
+        
+        // 犬の前に食べ物を配置
+        foodPosition = CGPoint(x: position.x, y: position.y + 20)
+        
+        // 食事状態に変更
         currentState = .eating
         idleCounter = 0
+        
+        // 食事アニメーションが終わった後も食べ物を表示しておく
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
+            print("🍖 食事アニメーション終了: 食べ物非表示")
+            if self.currentState != .eating {
+                self.showFood = false
+            }
+        }
     }
     
     // 遊びアニメーション
-    func showPlayingAnimation() {
+    private func showPlayingAnimation() {
         currentState = .playing
         idleCounter = 0
     }
