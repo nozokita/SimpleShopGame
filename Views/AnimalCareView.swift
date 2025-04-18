@@ -15,11 +15,19 @@ struct AnimalCareView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // 時間帯に応じた背景画像
+                // 背景色（画像がカバーしきれない部分用）
+                Color(hex: viewModel.isDaytime ? 0xE1F5FE : 0x263238)
+                    .ignoresSafeArea()
+                
+                // 背景画像
                 Image(viewModel.isDaytime ? "bg_room_day_portrait" : "bg_room_night_portrait")
                     .resizable()
-                    .scaledToFill()
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(
+                        width: max(geometry.size.width, geometry.size.height * 0.5625), // 16:9のアスペクト比を考慮
+                        height: geometry.size.height
+                    )
+                    .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
                     .clipped()
                     .ignoresSafeArea()
                     .animation(.easeInOut(duration: 1.0), value: viewModel.isDaytime)

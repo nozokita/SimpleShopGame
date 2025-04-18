@@ -229,6 +229,59 @@ class GameViewModel: ObservableObject {
         player?.play()
     }
 
+    /// 注文を音声で読み上げるメソッド
+    func speakPrompt() {
+        // currentOrderがnilの場合は何もしない
+        guard let order = currentOrder else { return }
+        
+        // 読み上げる言語と内容を選択
+        let textToSpeak: String
+        
+        // 現在のゲームモードによって適切なテキストを準備
+        switch currentGameMode {
+        case .shopping, .listeningQuiz:
+            // ショッピングモードとリスニングモードは注文テキストを読み上げる
+            if currentGameMode == .listeningQuiz && currentLanguage == "en" {
+                // リスニングモードでは生成したテキストを使用
+                textToSpeak = generateShoppingOrderText(order: order)
+            } else {
+                // 通常のショッピングモードではdisplayOrderTextを使用
+                textToSpeak = displayOrderText()
+            }
+            
+        case .calculationQuiz:
+            // 計算モードでは計算問題を読み上げる
+            if currentLanguage == "ja" {
+                textToSpeak = "いくつですか？"
+            } else {
+                textToSpeak = "How many items in total?"
+            }
+            
+        case .priceQuiz:
+            // 価格クイズモードでは価格問題を読み上げる
+            if currentLanguage == "ja" {
+                textToSpeak = "いくらですか？"
+            } else {
+                textToSpeak = "How much is it?"
+            }
+        }
+        
+        // 音声合成を使用して読み上げる
+        let utterance = AVSpeechUtterance(string: textToSpeak)
+        utterance.voice = AVSpeechSynthesisVoice(language: currentLanguage == "ja" ? "ja-JP" : "en-US")
+        utterance.rate = currentLanguage == "ja" ? 0.43 : 0.5 // 日本語の場合は少し遅めに
+        utterance.pitchMultiplier = 1.1 // 声の高さ
+        utterance.volume = 1.0 // 音量（0.0-1.0）
+        
+        // 既存の読み上げを中止
+        if speechSynthesizer.isSpeaking {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+        }
+        
+        // 音声合成を実行
+        speechSynthesizer.speak(utterance)
+    }
+
     /// 指定されたファイル名の音声ファイルをロードしてAVAudioPlayerを生成する
     private func loadSound(fileName: String) -> AVAudioPlayer? {
         // mp3形式を想定
@@ -286,31 +339,6 @@ class GameViewModel: ObservableObject {
     private func selectRandomCustomer() {
         currentCustomerImageName = customerImageNames.randomElement() ?? "customer1"
         print("Selected customer: \(currentCustomerImageName)")
-    }
-
-    // MARK: - Speech Output (追加)
-    /// 現在の注文内容を読み上げる (英語のみ)
-    private func speakOrder() {
-        guard currentLanguage == "en" else { return }
-        
-        var textToSpeak = ""
-        // リスニングモードの場合は、内部的に持っている正しい注文テキストを読み上げる
-        if currentGameMode == .listeningQuiz, let order = currentOrder {
-            textToSpeak = generateShoppingOrderText(order: order) // Shoppingモードのテキスト生成を流用
-        } else {
-             textToSpeak = displayOrderText() // それ以外のモードは表示テキストを読む
-        }
-
-        guard !textToSpeak.isEmpty, textToSpeak != "...", textToSpeak != "Listen!" else { return }
-
-        if speechSynthesizer.isSpeaking {
-            speechSynthesizer.stopSpeaking(at: .immediate)
-        }
-        let utterance = AVSpeechUtterance(string: textToSpeak)
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        utterance.pitchMultiplier = 1.0
-        speechSynthesizer.speak(utterance)
     }
 
     // MARK: - Game Logic Methods
@@ -1041,63 +1069,6 @@ class GameViewModel: ObservableObject {
              // if self.mistakeCount >= self.maxMistakes { self.handleTimeUp() }
          }
      }
-
-    // MARK: - Speech Synthesis (★ 追加)
-    /// 現在の注文プロンプトを読み上げる
-    func speakPrompt() {
-        // ★ currentOrderがnilでないことを確認 (警告修正: `let order` -> `let _`)\n        guard let _ = currentOrder else { \n            print(\"Cannot speak prompt: currentOrder is nil.\")\n            return\n        }\n        \n// ... existing code ...\n        }\n        \n        // 発声\n        // ★ エスケープシーケンス修正: `\[` -> `[`\n        print(\"Speaking prompt ([\(self.currentLanguage)]): \(textToSpeak)\") \n        speechSynthesizer.speak(utterance)\n    }\n    \n// ... existing code ...\n        if speechSynthesizer.isSpeaking {\n            speechSynthesizer.stopSpeaking(at: .immediate)\n        }\n        // ★ エスケープシーケンス修正: `\[` -> `[`\n        print(\"Speaking text ([\(self.currentLanguage)]): \(text)\") \n        speechSynthesizer.speak(utterance)\n    }\n} \n\n// ... existing code ...
-        guard let _ = currentOrder else { 
-            print("Cannot speak prompt: currentOrder is nil.")
-            return
-        }
-        
-        // ★ displayOrderText() を使って、モードに応じた適切なテキストを取得
-        let textToSpeak = displayOrderText()
-        guard !textToSpeak.isEmpty && textToSpeak != "..." else {
-            print("Cannot speak prompt: Generated text is empty or placeholder.")
-            return
-        }
-
-        let utterance = AVSpeechUtterance(string: textToSpeak)
-        
-        // 日本語の場合は日本語、英語の場合は英語の音声を選択
-        if currentLanguage == "ja" {
-             utterance.voice = AVSpeechSynthesisVoice(language: "ja-JP")
-             // ★ 日本語の場合、少し遅めに設定 (0.45 -> 0.43 に変更)
-             utterance.rate = AVSpeechUtteranceMaximumSpeechRate * 0.43 
-        } else {
-             utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-             // 英語の場合、標準より少しだけ遅め (0.5)
-             utterance.rate = AVSpeechUtteranceMaximumSpeechRate * 0.5 
-        }
-        
-        // 以前の読み上げが進行中なら停止
-        if speechSynthesizer.isSpeaking {
-            speechSynthesizer.stopSpeaking(at: .immediate)
-        }
-        
-        // 発声
-        print("Speaking prompt ([\(self.currentLanguage)]): \(textToSpeak)")
-        speechSynthesizer.speak(utterance)
-    }
-    
-    /// 指定したテキストを読み上げるヘルパー関数 (任意で追加)
-    func speakText(_ text: String) {
-         let utterance = AVSpeechUtterance(string: text)
-        if currentLanguage == "ja" {
-             utterance.voice = AVSpeechSynthesisVoice(language: "ja-JP")
-             // ★ 日本語の場合、少し遅めに設定 (0.45 -> 0.43 に変更)
-             utterance.rate = AVSpeechUtteranceMaximumSpeechRate * 0.43 
-        } else {
-             utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-             utterance.rate = AVSpeechUtteranceMaximumSpeechRate * 0.5
-        }
-        if speechSynthesizer.isSpeaking {
-            speechSynthesizer.stopSpeaking(at: .immediate)
-        }
-        print("Speaking text ([\(self.currentLanguage)]): \(text)")
-        speechSynthesizer.speak(utterance)
-    }
 
     // MARK: - Animal Care Methods
     /// 子犬に餌をあげる - 満腹度と機嫌が上がる
