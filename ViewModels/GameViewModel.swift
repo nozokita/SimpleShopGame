@@ -1169,6 +1169,44 @@ class GameViewModel: ObservableObject {
     @Published var lastPoopTime: Date = Date().addingTimeInterval(-3600) // 1時間前
     @Published var showCleaningAnimation: Bool = false
     
+    // 時間帯関連の状態管理
+    @Published var isDaytime: Bool = true
+    private var timeOfDayTimer: Timer?
+    
+    /// 現在の時間帯を更新する
+    func updateTimeOfDay() {
+        let calendar = Calendar.current
+        let hour = calendar.component(.hour, from: Date())
+        
+        // 6時〜18時を昼間、それ以外を夜とする
+        isDaytime = (6...18).contains(hour)
+    }
+    
+    /// 時間帯更新タイマーを開始する
+    func startTimeOfDayTimer() {
+        // 初期状態を設定
+        updateTimeOfDay()
+        
+        // すでにタイマーがある場合は無効化
+        timeOfDayTimer?.invalidate()
+        
+        // 1分ごとに時間帯をチェック
+        timeOfDayTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            self?.updateTimeOfDay()
+        }
+    }
+    
+    /// 時間帯更新タイマーを停止する
+    func stopTimeOfDayTimer() {
+        timeOfDayTimer?.invalidate()
+        timeOfDayTimer = nil
+    }
+    
+    /// デモ用に時間帯を切り替える（開発用）
+    func toggleTimeOfDay() {
+        isDaytime.toggle()
+    }
+    
     /// うんちの数を計算する - 一定時間経過ごとにうんちが増える
     func calculatePoops() {
         // 前回のお掃除からの経過時間に基づいてうんちの数を計算

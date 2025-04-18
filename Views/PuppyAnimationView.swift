@@ -201,8 +201,8 @@ struct PuppyAnimationView: View {
     
     // アニメーション開始
     private func startAnimation() {
-        // 初期位置を設定
-        position = CGPoint(x: CGFloat.random(in: 50..<size.width-50), y: size.height - 70)
+        // 初期位置を設定 - 床にきちんと接地するよう調整
+        position = CGPoint(x: CGFloat.random(in: 50..<size.width-50), y: size.height - 40)
         
         // 初期状態を設定
         currentState = determineState()
@@ -285,10 +285,11 @@ struct PuppyAnimationView: View {
         let newX = position.x + (walkingDirection * 10)
         position.x = max(50, min(newX, size.width - 50))
         
-        // Y座標もわずかに変動させる
+        // Y座標もわずかに変動させるが、地面から浮かないよう制限
         if Int.random(in: 0...5) == 0 {
-            let newY = position.y + CGFloat.random(in: -5...5)
-            position.y = max(size.height - 100, min(newY, size.height - 50))
+            let newY = position.y + CGFloat.random(in: -3...3)
+            // 床との接地を維持するため、Y座標の変動を制限
+            position.y = max(size.height - 45, min(newY, size.height - 35))
         }
     }
     
@@ -392,9 +393,9 @@ struct PuppyAnimationView: View {
         // うんちが増えた場合は新しいうんちを追加
         if count > poopPositions.count {
             for _ in poopPositions.count..<count {
-                // ランダムな位置にうんちを配置
+                // ランダムな位置にうんちを配置（床に接地するよう調整）
                 let randomX = CGFloat.random(in: 50..<size.width-50)
-                let randomY = CGFloat.random(in: size.height-100..<size.height-20)
+                let randomY = CGFloat.random(in: size.height-50..<size.height-30)
                 poopPositions.append(CGPoint(x: randomX, y: randomY))
             }
         }
