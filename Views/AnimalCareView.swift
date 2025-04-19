@@ -23,9 +23,9 @@ struct AnimalCareView: View {
                 Image(viewModel.isDaytime ? "bg_room_day_portrait" : "bg_room_night_portrait")
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: geometry.size.width, height: geometry.size.height * 1.1)
-                    .scaleEffect(1.2) // さらに拡大して確実に画面全体をカバー
-                    .offset(y: -20) // 上に少しずらして下部をカバー
+                    .frame(width: geometry.size.width, height: geometry.size.height * 1.05)
+                    .scaleEffect(1.15) // ズームを1.15に戻す
+                    .offset(y: -15) // オフセット
                     .edgesIgnoringSafeArea(.all)
                     .animation(.easeInOut(duration: 1.0), value: viewModel.isDaytime)
                 
