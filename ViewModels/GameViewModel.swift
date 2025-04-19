@@ -1101,8 +1101,8 @@ class GameViewModel: ObservableObject {
             self.showEatingAnimation = false
         }
         
-        // 音を鳴らす
-        playSoundEffect(.correct)
+        // 操作時間を更新
+        updateLastInteraction()
     }
     
     /// 子犬と遊ぶ
@@ -1124,8 +1124,8 @@ class GameViewModel: ObservableObject {
             self.showPlayingAnimation = false
         }
         
-        // 音を鳴らす
-        playSoundEffect(.correct)
+        // 操作時間を更新
+        updateLastInteraction()
     }
     
     /// 子犬の状態を時間経過に応じて更新する
@@ -1239,8 +1239,8 @@ class GameViewModel: ObservableObject {
         // 掃除すると機嫌が上がる
         puppyHappiness = min(puppyHappiness + 5, 100)
         
-        // 音を鳴らす
-        playSoundEffect(.correct)
+        // 操作時間を更新
+        updateLastInteraction()
     }
 
     // MARK: - Pet Name & Adoption Management
