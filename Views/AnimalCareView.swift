@@ -23,7 +23,9 @@ struct AnimalCareView: View {
                 Image(viewModel.isDaytime ? "bg_room_day_portrait" : "bg_room_night_portrait")
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .frame(width: geometry.size.width, height: geometry.size.height * 1.1)
+                    .scaleEffect(1.2) // さらに拡大して確実に画面全体をカバー
+                    .offset(y: -20) // 上に少しずらして下部をカバー
                     .edgesIgnoringSafeArea(.all)
                     .animation(.easeInOut(duration: 1.0), value: viewModel.isDaytime)
                 
@@ -170,11 +172,11 @@ struct AnimalCareView: View {
                         Ellipse()
                             .fill(Color.black.opacity(0.1))
                             .frame(width: 200, height: 50)
-                            .offset(y: geometry.size.height * 0.18)
+                            .offset(y: geometry.size.height * 0.15)
                         
                         // 子犬のアニメーション表示
-                        PuppyAnimationView(viewModel: viewModel, size: CGSize(width: geometry.size.width, height: geometry.size.height * 0.4))
-                            .frame(width: geometry.size.width, height: geometry.size.height * 0.4)
+                        PuppyAnimationView(viewModel: viewModel, size: CGSize(width: geometry.size.width, height: geometry.size.height * 0.35))
+                            .frame(width: geometry.size.width, height: geometry.size.height * 0.35)
                         
                         // ステータスメッセージ
                         if showStatusMessage {
@@ -202,7 +204,7 @@ struct AnimalCareView: View {
                                         alignment: .bottom
                                     )
                             }
-                            .offset(y: -120)
+                            .offset(y: -100)
                             .transition(
                                 .asymmetric(
                                     insertion: .scale(scale: 0.8).combined(with: .opacity)
@@ -212,13 +214,13 @@ struct AnimalCareView: View {
                             )
                         }
                     }
-                    .frame(height: geometry.size.height * 0.4) // 表示エリアを少し小さく
+                    .frame(height: geometry.size.height * 0.35) // 表示エリアを小さく
                     
-                    // スペーサーを増やしてアクションパネルを下げる
-                    Spacer(minLength: 30)
+                    // アニメーション表示とアクションパネルの間にスペーサーを追加
+                    Spacer(minLength: 20)
                     
                     // アクションパネル
-                    VStack(spacing: 4) {
+                    VStack(spacing: 3) {
                         // パネルヘッダー
                         HStack {
                             Text("アクション")
@@ -228,7 +230,7 @@ struct AnimalCareView: View {
                         }
                         .padding(.horizontal, 14)
                         .padding(.top, 8)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, 2)
                         
                         Divider()
                             .background(Color(hex: 0xE0E0E0))
@@ -270,7 +272,7 @@ struct AnimalCareView: View {
                             )
                         }
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 8)
                     }
                     .background(
                         RoundedRectangle(cornerRadius: 16)
@@ -282,7 +284,10 @@ struct AnimalCareView: View {
                             .stroke(Color.white, lineWidth: 2)
                     )
                     .padding(.horizontal)
-                    .padding(.bottom, max(geometry.safeAreaInsets.bottom + 5, 20)) // 下部のパディングを少し減らす
+                    .padding(.bottom, 5) // 底部パディングをさらに減らす
+                    
+                    // 下部に小さなスペーサーを追加（上に押し上げすぎないように調整）
+                    Spacer(minLength: 10)
                 }
             }
             .onAppear {
@@ -454,7 +459,7 @@ struct ActionButton: View {
             Image(imageName)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 54, height: 54)
+                .frame(width: 50, height: 50)
                 .opacity(isDisabled ? 0.5 : 1.0)
                 .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
         }
