@@ -5,6 +5,7 @@ struct AnimalCareView: View {
     @State private var showStatusMessage: Bool = false
     @State private var statusMessage: String = ""
     @State private var showMiniGame: Bool = false
+    @State private var showNameInputDialog: Bool = false
     
     // 画面サイズ取得用
     @State private var containerSize: CGSize = .zero
@@ -84,6 +85,50 @@ struct AnimalCareView: View {
                                 .cornerRadius(10)
                         }
                     }
+                    
+                    // 子犬の名前と飼育日数パネル
+                    VStack(spacing: 4) {
+                        HStack {
+                            // 名前ラベル
+                            Text(viewModel.puppyName == "まだ名前がありません" ? "名前をつけよう" : viewModel.puppyName)
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .foregroundColor(Color(hex: 0x5D4037))
+                            
+                            // 名前変更ボタン
+                            Button(action: {
+                                showNameInputDialog = true
+                            }) {
+                                Image(systemName: "pencil.circle")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(Color(hex: 0x8D6E63))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Spacer()
+                            
+                            // 飼育日数
+                            Text("一緒に \(viewModel.puppyDaysWithYou)日目")
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .foregroundColor(Color(hex: 0x8D6E63))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color(hex: 0xFFF3E0).opacity(0.8))
+                                .cornerRadius(10)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                    }
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.white)
+                            .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 4)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.white, lineWidth: 1.5)
+                    )
+                    .padding(.horizontal)
+                    .padding(.bottom, 6)
                     
                     // ステータスパネル
                     VStack(spacing: 8) {
@@ -319,6 +364,9 @@ struct AnimalCareView: View {
                 viewModel.stopTimeOfDayTimer()
             }
         }
+        .sheet(isPresented: $showNameInputDialog) {
+            PuppyNameInputView(viewModel: viewModel, isPresented: $showNameInputDialog)
+        }
     }
     
     // 最終ケア時刻のフォーマット
@@ -509,5 +557,119 @@ struct Triangle: Shape {
 struct AnimalCareView_Previews: PreviewProvider {
     static var previews: some View {
         AnimalCareView(viewModel: GameViewModel())
+    }
+}
+
+// 子犬の名前入力ビュー
+struct PuppyNameInputView: View {
+    @ObservedObject var viewModel: GameViewModel
+    @Binding var isPresented: Bool
+    @State private var newPuppyName: String = ""
+    @State private var showError: Bool = false
+    @FocusState private var isTextFieldFocused: Bool
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // ヘッダー
+            Text("子犬の名前を入力")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundColor(Color(hex: 0x5D4037))
+                .padding(.top, 20)
+            
+            // 現在の名前
+            if viewModel.puppyName != "まだ名前がありません" {
+                Text("現在の名前: \(viewModel.puppyName)")
+                    .font(.system(size: 16, design: .rounded))
+                    .foregroundColor(Color(hex: 0x8D6E63))
+            }
+            
+            // 入力フィールド
+            TextField("名前を入力してください", text: $newPuppyName)
+                .font(.system(size: 18))
+                .padding()
+                .background(Color.white)
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color(hex: 0xBDBDBD), lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
+                .focused($isTextFieldFocused)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        isTextFieldFocused = true
+                    }
+                }
+            
+            // エラーメッセージ
+            if showError {
+                Text("名前を入力してください")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+            
+            // 飼育開始日の選択（初めて名前をつける場合のみ）
+            if viewModel.puppyName == "まだ名前がありません" {
+                Text("今日から一緒に暮らし始めます")
+                    .font(.system(size: 14, design: .rounded))
+                    .foregroundColor(Color(hex: 0x8D6E63))
+            }
+            
+            // ボタン
+            HStack(spacing: 20) {
+                // キャンセルボタン
+                Button(action: {
+                    isPresented = false
+                }) {
+                    Text("キャンセル")
+                        .font(.system(size: 16, weight: .medium))
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 30)
+                        .background(Color.gray.opacity(0.2))
+                        .foregroundColor(Color.gray)
+                        .cornerRadius(8)
+                }
+                
+                // 保存ボタン
+                Button(action: {
+                    if newPuppyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        showError = true
+                        return
+                    }
+                    
+                    // 名前を保存
+                    viewModel.savePuppyName(newPuppyName)
+                    
+                    // 初めて名前を付ける場合は飼育開始日も保存
+                    if viewModel.puppyName == "まだ名前がありません" {
+                        viewModel.savePuppyAdoptionDate(Date())
+                    }
+                    
+                    // ダイアログを閉じる
+                    isPresented = false
+                    
+                    // 効果音
+                    viewModel.playSoundEffect(.correct)
+                }) {
+                    Text("保存")
+                        .font(.system(size: 16, weight: .bold))
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 30)
+                        .background(Color(hex: 0x4CAF50))
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+            }
+            .padding(.top, 10)
+            
+            Spacer()
+        }
+        .padding()
+        .onAppear {
+            // 現在の名前を初期値としてセット（まだ名前がない場合は空文字）
+            if viewModel.puppyName != "まだ名前がありません" {
+                newPuppyName = viewModel.puppyName
+            }
+        }
     }
 } 

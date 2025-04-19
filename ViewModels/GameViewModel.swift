@@ -163,6 +163,7 @@ class GameViewModel: ObservableObject {
         remainingTime = selectedTimeLimitOption.rawValue // 初期値を設定
         loadProducts() // 商品データは最初にロードしておく
         loadSounds()
+        initializePuppyInfo() // 子犬の情報を初期化
     }
 
     deinit { // ViewModelが破棄されるときにタイマーを停止
@@ -1140,6 +1141,10 @@ class GameViewModel: ObservableObject {
     @Published var lastPoopTime: Date = Date().addingTimeInterval(-3600) // 1時間前
     @Published var showCleaningAnimation: Bool = false
     
+    // 子犬の名前と飼育日数関連
+    @Published var puppyName: String = "まだ名前がありません"
+    @Published var puppyAdoptionDate: Date = Date()
+    
     // 時間帯関連の状態管理
     @Published var isDaytime: Bool = true
     private var timeOfDayTimer: Timer?
@@ -1219,5 +1224,51 @@ class GameViewModel: ObservableObject {
         
         // 音を鳴らす
         playSoundEffect(.correct)
+    }
+
+    // MARK: - Pet Name & Adoption Management
+    
+    /// 子犬の名前を保存する
+    func savePuppyName(_ name: String) {
+        puppyName = name
+        UserDefaults.standard.set(name, forKey: "puppyName")
+    }
+    
+    /// 子犬の名前を読み込む
+    func loadPuppyName() {
+        if let savedName = UserDefaults.standard.string(forKey: "puppyName") {
+            puppyName = savedName
+        }
+    }
+    
+    /// 飼育開始日を保存する
+    func savePuppyAdoptionDate(_ date: Date) {
+        puppyAdoptionDate = date
+        UserDefaults.standard.set(date, forKey: "puppyAdoptionDate")
+    }
+    
+    /// 飼育開始日を読み込む
+    func loadPuppyAdoptionDate() {
+        if let savedDate = UserDefaults.standard.object(forKey: "puppyAdoptionDate") as? Date {
+            puppyAdoptionDate = savedDate
+        } else {
+            // 初めて開く場合は現在日時を設定
+            puppyAdoptionDate = Date()
+            savePuppyAdoptionDate(puppyAdoptionDate)
+        }
+    }
+    
+    /// 飼育日数を計算して返す
+    var puppyDaysWithYou: Int {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.day], from: puppyAdoptionDate, to: Date())
+        return max(components.day ?? 0, 0) // nilや負の値の場合は0を返す
+    }
+    
+    /// 子犬の情報を初期化する
+    func initializePuppyInfo() {
+        // 既存の情報を読み込む
+        loadPuppyName()
+        loadPuppyAdoptionDate()
     }
 } 
