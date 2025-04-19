@@ -224,10 +224,24 @@ class GameViewModel: ObservableObject {
 
     /// 効果音を再生するメソッド
     func playSoundEffect(_ effect: SoundEffect) {
-        let soundFileName = effect.fileName
-        let player = loadSound(fileName: soundFileName)
-        player?.currentTime = 0
-        player?.play()
+        switch effect {
+        case .correct:
+            correctSoundPlayer?.stop()
+            correctSoundPlayer?.currentTime = 0
+            correctSoundPlayer?.play()
+            print("Playing correct sound")
+        case .incorrect:
+            incorrectSoundPlayer?.stop()
+            incorrectSoundPlayer?.currentTime = 0
+            incorrectSoundPlayer?.play()
+            print("Playing incorrect sound")
+        default:
+            // 他の効果音の場合は既存の方法で再生
+            let soundFileName = effect.fileName
+            let player = loadSound(fileName: soundFileName)
+            player?.currentTime = 0
+            player?.play()
+        }
     }
 
     /// 注文を音声で読み上げるメソッド
@@ -286,8 +300,8 @@ class GameViewModel: ObservableObject {
     /// 指定されたファイル名の音声ファイルをロードしてAVAudioPlayerを生成する
     private func loadSound(fileName: String) -> AVAudioPlayer? {
         // mp3形式を想定
-        guard let soundURL = Bundle.main.url(forResource: fileName, withExtension: "mp3", subdirectory: "Sounds") else {
-            print("Error: Sound file \(fileName).mp3 not found in Sounds directory.")
+        guard let soundURL = Bundle.main.url(forResource: fileName, withExtension: "mp3") else {
+            print("Error: Sound file \(fileName).mp3 not found in main bundle.")
             return nil
         }
 
