@@ -36,8 +36,6 @@ struct AnimalCareView: View {
                     HStack {
                         // ホームボタン
                         Button(action: {
-                            // 音を鳴らす
-                            viewModel.playSoundEffect(.correct)
                             viewModel.gameState = .initialSelection
                         }) {
                             Image(systemName: "house.fill")
@@ -401,7 +399,6 @@ struct AnimalCareView: View {
     private func feedAction() {
         if !viewModel.showEatingAnimation { // 既に食事中なら何もしない
             viewModel.feedPuppy()
-            viewModel.playSoundEffect(.correct)
             statusMessage = "ごはんをあげました！"
             showStatusMessage = true
             
@@ -414,7 +411,6 @@ struct AnimalCareView: View {
     private func playAction() {
         if !viewModel.showPlayingAnimation { // 既に遊んでいる途中なら何もしない
             viewModel.playWithPuppy()
-            viewModel.playSoundEffect(.correct)
             statusMessage = "一緒に遊びました！"
             showStatusMessage = true
             
@@ -428,7 +424,6 @@ struct AnimalCareView: View {
         if !viewModel.showPettingAnimation { // 既に撫でている途中なら何もしない
             viewModel.puppyHappiness = min(viewModel.puppyHappiness + 5, 100)
             viewModel.showPettingAnimation = true
-            viewModel.playSoundEffect(.correct)
             statusMessage = "撫でてあげました！"
             showStatusMessage = true
             
@@ -442,7 +437,6 @@ struct AnimalCareView: View {
         if viewModel.poopCount > 0 && !viewModel.showCleaningAnimation { // うんちがあり、掃除中でなければ
             viewModel.cleanPoops()
             viewModel.showCleaningAnimation = true
-            viewModel.playSoundEffect(.correct)
             statusMessage = "お掃除しました！"
             showStatusMessage = true
             
@@ -603,9 +597,6 @@ struct PuppyNameInputView: View {
                     
                     // ダイアログを閉じる
                     isPresented = false
-                    
-                    // 効果音
-                    viewModel.playSoundEffect(.correct)
                 }) {
                     Text("保存")
                         .font(.system(size: 16, weight: .bold))
