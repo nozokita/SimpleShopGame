@@ -127,14 +127,8 @@ struct PuppyAnimationView: View {
         get {
             switch currentState {
                 case .idle:
-                    // 歩行アニメーション：方向に応じた画像を表示（フレーム1のみ）
-                    if walkingDirection > 0 {
-                        // 右に移動する時は左向きの画像
-                        return "puppy_walk_l1"
-                    } else {
-                        // 左に移動する時は右向きの画像
-                        return "puppy_walk_r1"
-                    }
+                    // 待機状態の場合は puppy_idle_1 を使用
+                    return "puppy_idle_1"
                 case .eating:
                     return "puppy_eating_1"
                 case .playing:
@@ -186,16 +180,16 @@ struct PuppyAnimationView: View {
         // ランダムに状態を変更
         let randomValue = Int.random(in: 0...100)
         
-        if randomValue < 60 {
-            return .walking
-        } else if randomValue < 70 {
+        if randomValue < 50 {
+            return .walking  // 歩行確率を少し下げる
+        } else if randomValue < 65 {
             return .happy
-        } else if randomValue < 80 {
-            return .idle
+        } else if randomValue < 85 {
+            return .idle     // 待機状態の確率を上げる
         } else if randomValue < 90 && viewModel.puppyHunger < 70 {
             return .hungry
         } else {
-            return .idle
+            return .idle     // それ以外は待機状態
         }
     }
     
@@ -221,13 +215,33 @@ struct PuppyAnimationView: View {
     private func updateAnimation() {
         // 状態に応じたアニメーション
         switch currentState {
-            case .walking, .idle:
+            case .walking:
                 // 歩行アニメーション
                 moveAround()
                 
-                // 一定確率で状態変更
-                if Int.random(in: 0...20) == 0 {
-                    currentState = determineState()
+                // 歩行中にidleCounterをインクリメントして歩行アニメーションを表現
+                idleCounter += 1
+                
+                // 一定確率で待機状態に切り替え
+                if Int.random(in: 0...30) == 0 {
+                    currentState = .idle
+                    idleCounter = 0
+                }
+                
+            case .idle:
+                // 待機状態では動かない
+                // カウンターを進めてアニメーションを表現（現在は単一フレームのみ）
+                idleCounter += 1
+                
+                // 一定時間(約3秒)待機した後に、新しい状態に遷移するか歩き出す
+                if idleCounter > 10 {
+                    idleCounter = 0
+                    // 60%の確率で歩き出す、40%の確率で他の状態に遷移
+                    if Int.random(in: 0...100) < 60 {
+                        currentState = .walking
+                    } else {
+                        currentState = determineState()
+                    }
                 }
                 
             case .eating:
@@ -276,18 +290,18 @@ struct PuppyAnimationView: View {
         } else if position.x > size.width - 50 {
             walkingDirection = -1
         }
-        // ランダムで方向転換
-        else if Int.random(in: 0...30) == 0 {
+        // ランダムで方向転換（確率を下げて、より長く同じ方向に移動するように）
+        else if Int.random(in: 0...40) == 0 {
             walkingDirection *= -1
         }
         
-        // 現在の方向に応じて移動
-        let newX = position.x + (walkingDirection * 10)
+        // 現在の方向に応じて移動（移動速度を遅く）
+        let newX = position.x + (walkingDirection * 5)
         position.x = max(50, min(newX, size.width - 50))
         
-        // Y座標もわずかに変動させるが、地面から浮かないよう制限
-        if Int.random(in: 0...5) == 0 {
-            let newY = position.y + CGFloat.random(in: -3...3)
+        // Y座標もわずかに変動させるが、地面から浮かないよう制限（変動を小さく）
+        if Int.random(in: 0...8) == 0 {
+            let newY = position.y + CGFloat.random(in: -2...2)
             // 床との接地を維持するため、Y座標の変動を制限
             position.y = max(size.height - 45, min(newY, size.height - 35))
         }
