@@ -171,12 +171,13 @@ struct AnimalCareView: View {
                         // 床の影 - 下部に配置して床に接地しているように見せる
                         Ellipse()
                             .fill(Color.black.opacity(0.1))
-                            .frame(width: 200, height: 50)
+                            .frame(width: 220, height: 55)
                             .offset(y: geometry.size.height * 0.15)
                         
                         // 子犬のアニメーション表示
-                        PuppyAnimationView(viewModel: viewModel, size: CGSize(width: geometry.size.width, height: geometry.size.height * 0.35))
-                            .frame(width: geometry.size.width, height: geometry.size.height * 0.35)
+                        PuppyAnimationView(viewModel: viewModel, size: CGSize(width: geometry.size.width, height: geometry.size.height * 0.4))
+                            .frame(width: geometry.size.width, height: geometry.size.height * 0.4)
+                            .scaleEffect(1.15) // 子犬自体のサイズを15%拡大
                         
                         // ステータスメッセージ
                         if showStatusMessage {
@@ -204,7 +205,7 @@ struct AnimalCareView: View {
                                         alignment: .bottom
                                     )
                             }
-                            .offset(y: -100)
+                            .offset(y: -110)
                             .transition(
                                 .asymmetric(
                                     insertion: .scale(scale: 0.8).combined(with: .opacity)
@@ -214,10 +215,10 @@ struct AnimalCareView: View {
                             )
                         }
                     }
-                    .frame(height: geometry.size.height * 0.35) // 表示エリアを小さく
+                    .frame(height: geometry.size.height * 0.4) // 表示エリアを小さく
                     
                     // アニメーション表示とアクションパネルの間にスペーサーを追加
-                    Spacer(minLength: 20)
+                    Spacer(minLength: 15)
                     
                     // アクションパネル
                     VStack(spacing: 3) {
