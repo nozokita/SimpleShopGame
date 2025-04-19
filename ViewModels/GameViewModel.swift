@@ -1144,7 +1144,10 @@ class GameViewModel: ObservableObject {
     // 子犬の名前と飼育日数関連
     @Published var puppyName: String = "まだ名前がありません"
     @Published var puppyAdoptionDate: Date = Date()
-    
+    @Published var isPuppyMissing: Bool = false
+    @Published var lastInteractionDate: Date = Date()
+    private let missingTimeThreshold: TimeInterval = 60 * 60 * 24 * 3 // 3日間
+
     // 時間帯関連の状態管理
     @Published var isDaytime: Bool = true
     private var timeOfDayTimer: Timer?
@@ -1232,6 +1235,7 @@ class GameViewModel: ObservableObject {
     func savePuppyName(_ name: String) {
         puppyName = name
         UserDefaults.standard.set(name, forKey: "puppyName")
+        updateLastInteraction() // 名前を付けたときに操作時間を更新
     }
     
     /// 子犬の名前を読み込む
@@ -1245,6 +1249,7 @@ class GameViewModel: ObservableObject {
     func savePuppyAdoptionDate(_ date: Date) {
         puppyAdoptionDate = date
         UserDefaults.standard.set(date, forKey: "puppyAdoptionDate")
+        updateLastInteraction() // 飼育開始日を設定したときに操作時間を更新
     }
     
     /// 飼育開始日を読み込む
@@ -1256,6 +1261,62 @@ class GameViewModel: ObservableObject {
             puppyAdoptionDate = Date()
             savePuppyAdoptionDate(puppyAdoptionDate)
         }
+    }
+    
+    /// 最後の操作日時を保存する
+    private func saveLastInteractionDate(_ date: Date) {
+        lastInteractionDate = date
+        UserDefaults.standard.set(date, forKey: "lastInteractionDate")
+    }
+    
+    /// 最後の操作日時を読み込む
+    private func loadLastInteractionDate() {
+        if let savedDate = UserDefaults.standard.object(forKey: "lastInteractionDate") as? Date {
+            lastInteractionDate = savedDate
+        } else {
+            // 初めての場合は現在日時を設定
+            lastInteractionDate = Date()
+            saveLastInteractionDate(lastInteractionDate)
+        }
+    }
+    
+    /// 子犬との最後の操作時間を更新する
+    func updateLastInteraction() {
+        let now = Date()
+        saveLastInteractionDate(now)
+        
+        // 操作があったので子犬が去った状態をリセット
+        if isPuppyMissing {
+            isPuppyMissing = false
+        }
+    }
+    
+    /// 子犬が去ったかどうかをチェックする
+    func checkPuppyMissing() {
+        let now = Date()
+        let timeSinceLastInteraction = now.timeIntervalSince(lastInteractionDate)
+        
+        // 一定時間操作がない場合、子犬が去った状態にする
+        if timeSinceLastInteraction > missingTimeThreshold && !isPuppyMissing {
+            isPuppyMissing = true
+        }
+    }
+    
+    /// 子犬の飼育をリセットする
+    func resetPuppyAdoption() {
+        // 新しい飼育開始日を設定
+        savePuppyAdoptionDate(Date())
+        
+        // 子犬が去った状態をリセット
+        isPuppyMissing = false
+        
+        // 操作時間を更新
+        updateLastInteraction()
+        
+        // 子犬の状態をリセット
+        puppyHunger = 100
+        puppyHappiness = 100
+        poopCount = 0
     }
     
     /// 飼育日数を計算して返す
@@ -1270,5 +1331,9 @@ class GameViewModel: ObservableObject {
         // 既存の情報を読み込む
         loadPuppyName()
         loadPuppyAdoptionDate()
+        loadLastInteractionDate()
+        
+        // 子犬が去ったかどうかをチェック
+        checkPuppyMissing()
     }
 } 

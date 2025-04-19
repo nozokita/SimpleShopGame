@@ -6,6 +6,7 @@ struct AnimalCareView: View {
     @State private var statusMessage: String = ""
     @State private var showMiniGame: Bool = false
     @State private var showNameInputDialog: Bool = false
+    @State private var animationTimer: Timer? = nil
     
     // 画面サイズ取得用
     @State private var containerSize: CGSize = .zero
@@ -24,9 +25,9 @@ struct AnimalCareView: View {
                 Image(viewModel.isDaytime ? "bg_room_day_portrait" : "bg_room_night_portrait")
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: geometry.size.width, height: geometry.size.height * 1.05)
-                    .scaleEffect(1.15) // ズームを1.15に戻す
-                    .offset(y: -15) // オフセット
+                    .frame(width: geometry.size.width, height: geometry.size.height * 1.1)
+                    .scaleEffect(1.15) // 1.15に戻して適切なズーム率を維持
+                    .offset(y: -20) // 上に少しずらして下部をカバー
                     .edgesIgnoringSafeArea(.all)
                     .animation(.easeInOut(duration: 1.0), value: viewModel.isDaytime)
                 
@@ -311,7 +312,7 @@ struct AnimalCareView: View {
                             
                             // トイレボタン
                             ActionButton(
-                                action: { cleanToiletAction() },
+                                action: { cleanAction() },
                                 imageName: "icon_clean",
                                 color: Color(hex: 0x2196F3),
                                 isDisabled: viewModel.poopCount == 0
@@ -337,31 +338,31 @@ struct AnimalCareView: View {
                 }
             }
             .onAppear {
-                // 画面表示時に子犬のステータスを更新
+                // 画面表示時に最新の状態に更新
                 viewModel.updatePuppyStatus()
-                // うんちの数も計算
-                viewModel.calculatePoops()
-                // 時間帯の更新タイマーを開始
+                
+                // 時間帯の自動切り替えを開始
                 viewModel.startTimeOfDayTimer()
                 
-                // うんちが3つ以上ある場合はメッセージを表示
-                if viewModel.poopCount >= 3 {
+                // 子犬との操作時間を更新
+                viewModel.updateLastInteraction()
+                
+                // アニメーションタイマーをリセット
+                animationTimer?.invalidate()
+                animationTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { _ in
+                    // 2.5秒ごとにステータスメッセージを非表示
                     withAnimation {
-                        showStatusMessage = true
-                        statusMessage = "トイレを掃除してね..."
-                    }
-                    
-                    // 3秒後にメッセージを非表示
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                        withAnimation {
-                            showStatusMessage = false
-                        }
+                        showStatusMessage = false
                     }
                 }
             }
             .onDisappear {
                 // 画面を離れる時にタイマーを停止
                 viewModel.stopTimeOfDayTimer()
+                
+                // アニメーションタイマーを無効化
+                animationTimer?.invalidate()
+                animationTimer = nil
             }
         }
         .sheet(isPresented: $showNameInputDialog) {
@@ -398,100 +399,55 @@ struct AnimalCareView: View {
     
     // 餌やりアクション
     private func feedAction() {
-        guard viewModel.puppyHunger < 90 else { return }
-        
-        // アニメーション
-        withAnimation {
+        if !viewModel.showEatingAnimation { // 既に食事中なら何もしない
+            viewModel.feedPuppy()
+            viewModel.playSoundEffect(.correct)
+            statusMessage = "ごはんをあげました！"
             showStatusMessage = true
-            statusMessage = "もぐもぐ♪"
-        }
-        
-        // ViewModel更新（ViewModelのメソッドでアニメーション制御も行う）
-        viewModel.feedPuppy()
-        
-        // メッセージ非表示
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation {
-                showStatusMessage = false
-            }
+            
+            // 操作時間を更新
+            viewModel.updateLastInteraction()
         }
     }
     
-    // 遊ぶアクション
+    // 遊びアクション
     private func playAction() {
-        guard viewModel.puppyHappiness < 90 else { return }
-        
-        // アニメーション
-        withAnimation {
+        if !viewModel.showPlayingAnimation { // 既に遊んでいる途中なら何もしない
+            viewModel.playWithPuppy()
+            viewModel.playSoundEffect(.correct)
+            statusMessage = "一緒に遊びました！"
             showStatusMessage = true
-            statusMessage = "わーい！"
-        }
-        
-        // ViewModel更新
-        viewModel.playWithPuppy()
-        
-        // メッセージ非表示
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation {
-                showStatusMessage = false
-            }
+            
+            // 操作時間を更新
+            viewModel.updateLastInteraction()
         }
     }
     
     // 撫でるアクション
     private func petAction() {
-        // アニメーション
-        withAnimation {
+        if !viewModel.showPettingAnimation { // 既に撫でている途中なら何もしない
+            viewModel.puppyHappiness = min(viewModel.puppyHappiness + 5, 100)
+            viewModel.showPettingAnimation = true
+            viewModel.playSoundEffect(.correct)
+            statusMessage = "撫でてあげました！"
             showStatusMessage = true
-            statusMessage = "すりすり～"
-        }
-        
-        // ViewModel更新 - 少し機嫌をアップ
-        viewModel.puppyHappiness = min(viewModel.puppyHappiness + 5, 100)
-        viewModel.lastAnimalCareTime = Date()
-        
-        // 撫でるアニメーションを表示
-        viewModel.showPettingAnimation = true
-        
-        // 少し経ったらリセット
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            viewModel.showPettingAnimation = false
-        }
-        
-        // 音を鳴らす
-        viewModel.playSoundEffect(.correct)
-        
-        // ハプティックフィードバック
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
-        
-        // メッセージ非表示
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            withAnimation {
-                showStatusMessage = false
-            }
+            
+            // 操作時間を更新
+            viewModel.updateLastInteraction()
         }
     }
     
-    // トイレ掃除アクション
-    private func cleanToiletAction() {
-        // うんちがない場合は無効
-        guard viewModel.poopCount > 0 else { return }
-        
-        // アニメーション
-        withAnimation {
+    // うんち掃除アクション
+    private func cleanAction() {
+        if viewModel.poopCount > 0 && !viewModel.showCleaningAnimation { // うんちがあり、掃除中でなければ
+            viewModel.cleanPoops()
+            viewModel.showCleaningAnimation = true
+            viewModel.playSoundEffect(.correct)
+            statusMessage = "お掃除しました！"
             showStatusMessage = true
-            statusMessage = "きれいになった！"
-        }
-        
-        // ViewModel更新
-        viewModel.cleanPoops()
-        
-        // メッセージ非表示
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation {
-                showStatusMessage = false
-            }
+            
+            // 操作時間を更新
+            viewModel.updateLastInteraction()
         }
     }
 }
